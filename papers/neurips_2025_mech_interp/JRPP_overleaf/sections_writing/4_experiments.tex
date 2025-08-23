@@ -1,0 +1,20 @@
+% \paragraph{Models} We evaluate using both the base \textsc{Llama-3 8B} and the categorical refusal-token fine-tuned \textsc{Llama-3 8B} model from \citet{jain2024refusaltokenssimpleway}, in which they prepend a category-specific ``[refuse]'' or ``[respond]'' token to model responses. 
+% % The refusal token directly precedes a refusal message in the model response. 
+
+% \paragraph{Datasets}  
+% To compute steering vectors, we primarily use two splits from the CoCoNot dataset from ~\citet{brahman2024artsayingnocontextual}: (1) \textit{CoCoNot-Orig} with truly harmful prompts and (2) \textit{CoCoNot-Contrast} containing benign but ambiguous prompts used for evaluating over-refusal. Additionally, we evaluate refusal behavior on WildJailbreak ~\citet{jiang2024wildteamingscaleinthewildjailbreaks} and OR-Bench ~\citet{cui2025orbenchoverrefusalbenchmarklarge}, both of which include subsets used for benchmarking over-refusal. We also evaluate general language model performance by measuring accuracy on general benchmarks such as GSM8K ~\citet{cobbe2021trainingverifierssolvemath}, MMLU ~\citet{hendrycks2021measuringmassivemultitasklanguage}, and TruthfulQA ~\citet{lin2022truthfulqameasuringmodelsmimic}.
+
+% \paragraph{Computing and Evaluating Steering Vectors} We choose to hook at the residual-stream activations after the MLP in layer $9$. We set $\tau=10^{-3}$ and $K = 200$ for computing steering vectors. To assess category distinctiveness, we compute pairwise cosine similarities and visualize the vectors via 2D PCA and t-SNE.
+
+% \paragraph{Refusal Rate Evaluation} We evaluate model refusal rates in two ways. The first approach is to use an LLM as a judge, specifically \textsc{Gemini 2.5 Flash} ~\citet{comanici2025gemini25pushingfrontier}, to detect whether model responses contain refusal messages. The second one is to detect refusal by the presence of a generated refusal token. We primarily use the first approach to evaluate \textsc{Llama-3 8B} and the second approach to assess the refusal token fine-tuned model and the steered model.
+
+% % Silhouette, Davies--Bouldin, and Calinski--Harabasz scores
+
+We evaluate four models: (1) the original, non–fine-tuned \textsc{Llama-3 8B Base} as our baseline; (2) the binary refusal-token fine-tuned model from \citet{jain2024refusaltokenssimpleway}, which outputs a generic ``[refuse]'' or ``[respond]'' token; (3) the categorical refusal-token fine-tuned model from \citet{jain2024refusaltokenssimpleway}, which prepends category-specific refusal tokens and is the source of our steering vectors; and (4) our conditionally steered model, which applies categorical steering at inference time.
+
+
+To compute steering vectors, we use CoCoNot~\citep{brahman2024artsayingnocontextual} with (1) \textit{Orig} for harmful and (2) \textit{Contrast} for ambiguous benign prompts. We evaluate refusal behavior using WildJailbreak~\citep{jiang2024wildteamingscaleinthewildjailbreaks} and OR-Bench~\citep{cui2025orbenchoverrefusalbenchmarklarge}, and assess general model performance on GSM8K~\citep{cobbe2021trainingverifierssolvemath}, MMLU~\citep{hendrycks2021measuringmassivemultitasklanguage}, and TruthfulQA~\citep{lin2022truthfulqameasuringmodelsmimic}.
+
+We evaluate model refusal rates in two ways. The first approach is to use an LLM as a judge, specifically \textsc{Gemini 2.5 Flash} ~\citep{comanici2025gemini25pushingfrontier}, to detect whether model responses contain refusal messages. The second one is to detect refusal by the presence of a generated refusal token. We primarily use the first approach to evaluate \textsc{Llama-3 8B} and the second approach to assess the refusal token fine-tuned model and the steered model.
+
+% To assess refusal behavior, we use two approaches: (1) prompting \textsc{Gemini 2.5 Flash}~\citep{comanici2025gemini25pushingfrontier} as an LLM judge to detect refusals, and (2) identifying generated refusal tokens. The first is used to evaluate the base model, and the second is used for the fine-tuned and steered models.
