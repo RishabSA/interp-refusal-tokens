@@ -10,8 +10,6 @@ transformer_lens
 datasets
 huggingface_hub
 sentencepiece
-circuitsvis
-eai-sparsify
 lm_eval
 openai
 python-dotenv
