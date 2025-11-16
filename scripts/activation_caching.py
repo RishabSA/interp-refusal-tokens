@@ -1,18 +1,33 @@
 from tqdm.notebook import tqdm
 import torch
-
-import transformer_lens
+from transformer_lens import HookedTransformer
 from transformer_lens.utils import get_act_name
+from torch.utils.data import DataLoader
 
 
 def cache_hooked_activations_before_pad(
-    hooked_model,
-    iterator,
+    hooked_model: HookedTransformer,
+    iterator: DataLoader,
     activation_name: str = "resid_post",
     layer: int = 16,
     prompt_seq_append: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-):
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Caches the activations of shape [4096] before the first pad token (caching the last non-pad token) at a given layer and point in the layer using transformer_lens.
+
+    Caches the activations for each of the prompts given in the iterator.
+
+    Args:
+        hooked_model (HookedTransformer)
+        iterator (DataLoader)
+        activation_name (str, optional): Position in the layer to hook at. Defaults to "resid_post".
+        layer (int, optional): Layer to hook at. Defaults to 16.
+        prompt_seq_append (str, optional): Sequence to append to all prompts before caching the activation of the last non-pad token. Defaults to "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n".
+        device (torch.device, optional). Defaults to torch.device("cuda" if torch.cuda.is_available() else "cpu").
+
+    Returns:
+        tuple[torch.Tensor, torch.Tensor]: [N, 4096] tensor for all of the cached activations and [4096] tensor for the mean of the cached activations
+    """
     activations = []
 
     hook_name = get_act_name(activation_name, layer)
@@ -39,7 +54,7 @@ def cache_hooked_activations_before_pad(
 
     pad_id = hooked_model.tokenizer.pad_token_id
     if pad_id is None:
-        pad_id = 0  # transformer_lens often uses 0 when no pad_token is set
+        pad_id = 0  # Use 0 if no pad_token is set
 
     with torch.inference_mode():
         for batch in tqdm(iterator, desc="Extracting Activations"):
@@ -61,7 +76,7 @@ def cache_hooked_activations_before_pad(
             #     torch.arange(batch_size, device=device), current_positions
             # ]
 
-            # print("last token ids:", last_token_ids.tolist())
+            # print("Tokens being being cached:", last_token_ids.tolist())
 
             logits = hooked_model(tokens)
 

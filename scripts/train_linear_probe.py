@@ -5,12 +5,17 @@ from tqdm.notebook import tqdm
 import torch
 import torch.nn as nn
 from torch import optim
+from torch.utils.data import (
+    DataLoader,
+)
 from sklearn.metrics import roc_curve, auc
 
 from scripts.linear_probe import LinearMLPProbe, LowRankProbe
 
 
-def compute_mean_and_pca_basis(train_probe_dataloader, r: int = 32):
+def compute_mean_and_pca_basis(
+    train_probe_dataloader: DataLoader, r: int = 32
+) -> tuple[torch.Tensor, torch.Tensor]:
     features = []
     with torch.no_grad():
         for xb, _ in train_probe_dataloader:
@@ -36,7 +41,7 @@ def compute_mean_and_pca_basis(train_probe_dataloader, r: int = 32):
     return X_mean.float(), U_r.float()
 
 
-def compute_mean(train_probe_dataloader):
+def compute_mean(train_probe_dataloader: DataLoader) -> torch.Tensor:
     features = []
     with torch.no_grad():
         for xb, _ in train_probe_dataloader:
@@ -52,9 +57,9 @@ def compute_mean(train_probe_dataloader):
 
 
 def train_steering_linear_probe(
-    train_probe_dataloader,
-    val_probe_dataloader,
-    test_probe_dataloader,
+    train_probe_dataloader: DataLoader,
+    val_probe_dataloader: DataLoader,
+    test_probe_dataloader: DataLoader,
     d_model: int = 4096,
     lr: float = 1e-3,
     weight_decay: float = 1e-4,
@@ -63,7 +68,7 @@ def train_steering_linear_probe(
     use_calibrated_threshold: bool = True,
     checkpoint_path: str = "steering_probe_18_epoch_15.pt",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-):
+) -> tuple[nn.Module, float, float, float, float]:
     X_mean = compute_mean(train_probe_dataloader)
     X_mean = X_mean.to(device)
 
@@ -90,7 +95,9 @@ def train_steering_linear_probe(
 
     if os.path.exists(checkpoint_path):
         print("Resuming training from checkpoint...")
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        checkpoint = torch.load(
+            checkpoint_path, map_location=device, weights_only=False
+        )
 
         probe_model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
@@ -101,7 +108,7 @@ def train_steering_linear_probe(
     best_val_acc = 0.0
     best_test_acc = 0.0
 
-    def compute_auc(y_true, y_score):
+    def compute_auc(y_true: torch.Tensor, y_score: torch.Tensor) -> float:
         with torch.no_grad():
             # Approximate via rank statistic (Mann–Whitney U / ROC AUC equivalence)
 
@@ -130,7 +137,9 @@ def train_steering_linear_probe(
 
             return float(auc)
 
-    def per_class_accuracy(y_true, y_pred):
+    def per_class_accuracy(
+        y_true: torch.Tensor, y_pred: torch.Tensor
+    ) -> tuple[float, float]:
         y_true = y_true.int().cpu()
         y_pred = y_pred.int().cpu()
 
@@ -144,7 +153,9 @@ def train_steering_linear_probe(
 
         return benign_acc, harmful_acc
 
-    def plot_roc_with_thresholds(fpr, tpr, thr, annotate_every=12):
+    def plot_roc_with_thresholds(
+        fpr: np.ndarray, tpr: np.ndarray, thr: np.ndarray, annotate_every: int = 12
+    ) -> None:
         roc_auc = auc(fpr, tpr)
 
         plt.figure()
@@ -175,13 +186,15 @@ def train_steering_linear_probe(
         plt.title(f"ROC Curve (AUC={roc_auc:.3f})")
         plt.show()
 
-    def best_threshold_youden(fpr, tpr, thr):
+    def get_best_threshold_youden(
+        fpr: np.ndarray, tpr: np.ndarray, thr: np.ndarray
+    ) -> tuple[float, float, float, float]:
         J = tpr - fpr
         best_idx = np.argmax(J)
 
         return thr[best_idx], fpr[best_idx], tpr[best_idx], J[best_idx]
 
-    def center(x):
+    def center(x: torch.Tensor) -> torch.Tensor:
         return x - X_mean
 
     for epoch in tqdm(range(start_epoch, epochs), desc=f"Training for {epochs} epochs"):
@@ -231,14 +244,13 @@ def train_steering_linear_probe(
             y_val_np = all_y.cpu().numpy().astype(int)
             p_val_np = all_p.cpu().numpy()
 
-            # roc_curve from scikit-learn
             fpr, tpr, thr = roc_curve(y_val_np, p_val_np)
 
             print(fpr, tpr, thr)
 
             plot_roc_with_thresholds(fpr, tpr, thr)
 
-            probe_threshold, best_fpr, best_tpr, best_J = best_threshold_youden(
+            probe_threshold, best_fpr, best_tpr, best_J = get_best_threshold_youden(
                 fpr, tpr, thr
             )
 
@@ -314,9 +326,9 @@ def train_steering_linear_probe(
 
 
 def train_steering_low_rank_probe(
-    train_probe_dataloader,
-    val_probe_dataloader,
-    test_probe_dataloader,
+    train_probe_dataloader: DataLoader,
+    val_probe_dataloader: DataLoader,
+    test_probe_dataloader: DataLoader,
     d_model: int = 4096,
     rank: int = 64,
     lr: float = 1e-3,
@@ -325,7 +337,7 @@ def train_steering_low_rank_probe(
     layer: int = 16,
     checkpoint_path: str = "steering_low_rank_probe_18_epoch_15.pt",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-):
+) -> tuple[nn.Module, float, float, float]:
     X_mean, U_r = compute_mean_and_pca_basis(
         train_probe_dataloader, r=rank, device=device
     )
@@ -342,7 +354,9 @@ def train_steering_low_rank_probe(
 
     if os.path.exists(checkpoint_path):
         print("Resuming training from checkpoint...")
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        checkpoint = torch.load(
+            checkpoint_path, map_location=device, weights_only=False
+        )
 
         probe_model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
@@ -352,7 +366,7 @@ def train_steering_low_rank_probe(
     best_val_acc = 0.0
     best_test_acc = 0.0
 
-    def compute_auc(y_true, y_score):
+    def compute_auc(y_true: torch.Tensor, y_score: torch.Tensor) -> float:
         with torch.no_grad():
             # Approximate via rank statistic (Mann–Whitney U / ROC AUC equivalence)
 
@@ -379,9 +393,11 @@ def train_steering_low_rank_probe(
             U = ranks_pos.sum().item() - n_pos * (n_pos + 1) / 2.0
             auc = U / (n_pos * n_neg + 1e-8)
 
-            return float(auc)
+        return float(auc)
 
-    def per_class_accuracy(y_true, y_pred):
+    def per_class_accuracy(
+        y_true: torch.Tensor, y_pred: torch.Tensor
+    ) -> tuple[float, float]:
         y_true = y_true.int().cpu()
         y_pred = y_pred.int().cpu()
 
@@ -395,7 +411,7 @@ def train_steering_low_rank_probe(
 
         return benign_acc, harmful_acc
 
-    def center(x):
+    def center(x: torch.Tensor) -> torch.Tensor:
         return x - X_mean
 
     for epoch in tqdm(range(start_epoch, epochs), desc=f"Training for {epochs} epochs"):

@@ -1,12 +1,19 @@
 import torch
+from torch import amp
 from transformer_lens.utils import get_act_name
+from transformer_lens import (
+    HookedTransformer,
+)
+from transformers import (
+    PreTrainedTokenizerBase,
+)
 
 
 def generate_with_activation_patching(
-    clean_prompt,
-    corrupt_prompt,
-    hooked_model,
-    tokenizer,
+    clean_prompt: str,
+    corrupt_prompt: str,
+    hooked_model: HookedTransformer,
+    tokenizer: PreTrainedTokenizerBase,
     hidden_ids: list[int] | None = None,
     generate_baseline: bool = False,
     layer: int = 16,
@@ -15,7 +22,7 @@ def generate_with_activation_patching(
     do_sample: bool = False,
     SEED: int = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-):
+) -> str:
     hooked_model.reset_hooks()
 
     stop_ids = [
@@ -48,45 +55,41 @@ def generate_with_activation_patching(
 
     fwd_hooks = [(hook_name, patch_hook)]
 
-    # Re-generate with the hook
-    with hooked_model.hooks(fwd_hooks):
-        print("Generating patched...")
+    with torch.inference_mode(), amp.autocast(device.type, dtype=torch.float16):
+        if generate_baseline:
+            torch.manual_seed(SEED)
+            baseline = hooked_model.generate(
+                corrupt_tokens,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                return_type="str",
+                stop_at_eos=True,
+                eos_token_id=stop_ids,
+            )
 
-        torch.manual_seed(SEED)
-        patched = hooked_model.generate(
-            corrupt_tokens,
-            max_new_tokens=max_new_tokens,
-            do_sample=do_sample,
-            return_type="str",
-            stop_at_eos=True,
-            eos_token_id=stop_ids,
-        )
+            print(f"Baseline: {baseline}\n")
+
+        # Re-generate with the hook
+        with hooked_model.hooks(fwd_hooks):
+            torch.manual_seed(SEED)
+            patched = hooked_model.generate(
+                corrupt_tokens,
+                max_new_tokens=max_new_tokens,
+                do_sample=do_sample,
+                return_type="str",
+                stop_at_eos=True,
+                eos_token_id=stop_ids,
+            )
 
     hooked_model.reset_hooks()
-
-    if generate_baseline:
-        print("Generating baseline...")
-
-        torch.manual_seed(SEED)
-        baseline = hooked_model.generate(
-            corrupt_tokens,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            return_type="str",
-            stop_at_eos=True,
-            eos_token_id=stop_ids,
-        )
-
-        return baseline, patched
 
     return patched
 
 
 def generate_with_attribution_patching(
-    target_prompt,
-    hooked_model,
-    tokenizer,
-    layer: int = 6,
+    target_prompt: str,
+    hooked_model: HookedTransformer,
+    layer: int = 16,
     activation_name: str = "resid_post",
     refusal_token_id: int = 128259,
     top_k: int = 50,
@@ -96,7 +99,6 @@ def generate_with_attribution_patching(
     and gradient G = ∂L/∂A at (layer, act_name, position), and computes  saliency_i = A_i * G_i
     for each neuron i. Returns a sorted list of (neuron_idx, saliency).
     """
-
     hooked_model.eval()
 
     # Tokenization

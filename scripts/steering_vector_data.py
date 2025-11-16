@@ -10,10 +10,13 @@ from transformers import (
 from transformer_lens import (
     HookedTransformer,
 )
+
 from scripts.hooked_model import generate_hooked_model_response
 
 
-def get_contrast_steering_vector_data(batch_size: int = 4):
+def get_contrast_steering_vector_data(
+    batch_size: int = 4,
+) -> tuple[dict[str, DataLoader], dict[str, DataLoader]]:
     # COCONot Dataset loading
     coconot_orig = load_dataset("allenai/coconot", "original")  # 12.5k items
     coconot_contrast = load_dataset("allenai/coconot", "contrast")  # 379 items
@@ -23,7 +26,7 @@ def get_contrast_steering_vector_data(batch_size: int = 4):
     coconot_harmful_dataloaders = {}
     coconot_benign_dataloaders = {}
 
-    def prompt_category_collate(batch):
+    def prompt_category_collate(batch: list[dict]) -> dict[str, list[str]]:
         return {
             "prompt": [sample["prompt"] for sample in batch],
             "category": [sample.get("category") for sample in batch],
@@ -99,7 +102,9 @@ def get_contrast_steering_vector_data(batch_size: int = 4):
     return coconot_harmful_dataloaders, coconot_benign_dataloaders
 
 
-def get_old_steering_vector_data(batch_size: int = 4):
+def get_old_steering_vector_data(
+    batch_size: int = 4,
+) -> tuple[dict[str, DataLoader], dict[str, DataLoader]]:
     # COCONot Dataset loading
     coconot_orig = load_dataset("allenai/coconot", "original")  # 12.5k items
     coconot_contrast = load_dataset("allenai/coconot", "contrast")  # 379 items
@@ -109,7 +114,7 @@ def get_old_steering_vector_data(batch_size: int = 4):
     coconot_harmful_dataloaders = {}
     coconot_benign_dataloaders = {}
 
-    def prompt_category_collate(batch):
+    def prompt_category_collate(batch: list[dict]) -> dict[str, list[str]]:
         return {
             "prompt": [sample["prompt"] for sample in batch],
             "category": [sample.get("category") for sample in batch],
@@ -179,7 +184,7 @@ class SyntheticHarmfulDataset(Dataset):
     def __len__(self):
         return len(self.pairs)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> dict[str, str]:
         pair = self.pairs[idx]
 
         return {
@@ -196,7 +201,7 @@ class SyntheticBenignDataset(Dataset):
     def __len__(self):
         return len(self.pairs)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> dict[str, str]:
         pair = self.pairs[idx]
 
         return {
@@ -205,7 +210,9 @@ class SyntheticBenignDataset(Dataset):
         }
 
 
-def get_synthetic_steering_vector_data(batch_size: int = 4):
+def get_synthetic_steering_vector_data(
+    batch_size: int = 4,
+) -> tuple[dict[str, DataLoader], dict[str, DataLoader]]:
     data_path = Path("/workspace/refusal_dataset.json")
     with data_path.open("r", encoding="utf-8") as f:
         synthetic_items = json.load(f)
@@ -256,7 +263,7 @@ def print_synthetic_pairs(
     tokenizer: AutoTokenizer,
     SEED: int = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-):
+) -> None:
     data_path = Path("/workspace/refusal_dataset.json")
     with data_path.open("r", encoding="utf-8") as f:
         synthetic_items = json.load(f)

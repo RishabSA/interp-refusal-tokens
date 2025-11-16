@@ -1,10 +1,12 @@
 import matplotlib.pyplot as plt
+import torch
 import torch.nn.functional as F
 
 
 def compute_model_diffing_cosine_sims(
-    steering_vectors_activations, steering_vectors_activations_llama
-):
+    steering_vectors_activations: dict[str, torch.Tensor],
+    steering_vectors_activations_llama: dict[str, torch.Tensor],
+) -> dict[str, float]:
     model_diffing_cosine_sims = {}
 
     for (category, steering_vector), (category_llama, steering_vector_llama) in zip(
@@ -23,7 +25,7 @@ def compute_model_diffing_cosine_sims(
     return model_diffing_cosine_sims
 
 
-def plot_model_diffing_cosine_sims(model_diffing_cosine_sims):
+def plot_model_diffing_cosine_sims(model_diffing_cosine_sims: dict[str, float]) -> None:
     items = list(model_diffing_cosine_sims.items())
 
     categories = [category for category, value in items]

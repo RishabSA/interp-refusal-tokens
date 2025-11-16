@@ -1,12 +1,11 @@
 import time
 import torch
-from transformers import (
-    AutoTokenizer,
-    LlamaForCausalLM,
-)
+from transformers import AutoTokenizer, LlamaForCausalLM, PreTrainedTokenizerBase
 
 
-def load_model(model_id: str) -> LlamaForCausalLM:
+def load_model(
+    model_id: str = "tomg-group-umd/zephyr-llama3-8b-sft-refusal-n-contrast-multiple-tokens",
+) -> tuple[LlamaForCausalLM, PreTrainedTokenizerBase]:
     start_time = time.time()
 
     tokenizer = AutoTokenizer.from_pretrained(model_id)

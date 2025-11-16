@@ -7,11 +7,24 @@ from datasets import load_dataset
 
 
 class Counter:
+    """Helper class for counting refusals or anything else when evaluating on a dataset"""
+
     def __init__(self, start: int = 0):
         self.count = start
 
 
-def split_dataloader_by_category(iterator, category_field: str = "category"):
+def split_dataloader_by_category(
+    iterator: DataLoader, category_field: str = "category"
+) -> dict[str, DataLoader]:
+    """Given an iterator, splits the iterator into separate iterators by the given field.
+
+    Args:
+        iterator (DataLoader)
+        category_field (str, optional). Defaults to "category".
+
+    Returns:
+        dict[str, DataLoader]
+    """
     dataset = iterator.dataset
 
     # Collect indices for each category
@@ -36,7 +49,15 @@ def split_dataloader_by_category(iterator, category_field: str = "category"):
     return iterator_by_category
 
 
-def load_coconot_data(batch_size: int = 4):
+def load_coconot_test_data(batch_size: int = 4) -> dict[str, DataLoader]:
+    """Loads the test splits for COCONot Orig and Contrast from HuggingFace and returns dataloaders for each
+
+    Args:
+        batch_size (int, optional). Defaults to 4.
+
+    Returns:
+        dict[str, DataLoader]
+    """
     # COCONot
     coconot_orig = load_dataset("allenai/coconot", "original")  # 12.5k items
     coconot_contrast = load_dataset("allenai/coconot", "contrast")  # 379 items
@@ -70,7 +91,15 @@ def load_coconot_data(batch_size: int = 4):
     }
 
 
-def load_wildguard_data(batch_size: int = 4):
+def load_wildguard_test_data(batch_size: int = 4) -> dict[str, DataLoader]:
+    """Loads the test split for WildGuard from HuggingFace and returns a dataloader
+
+    Args:
+        batch_size (int, optional). Defaults to 4.
+
+    Returns:
+        dict[str, DataLoader]
+    """
     # WildGuard
     wildguard_test = load_dataset(
         "allenai/wildguardmix", "wildguardtest"
@@ -103,7 +132,15 @@ def load_wildguard_data(batch_size: int = 4):
     }
 
 
-def load_wildjailbreak_data(batch_size: int = 4):
+def load_wildjailbreak_test_data(batch_size: int = 4) -> dict[str, DataLoader]:
+    """Loads the test split for WildJailbreak from HuggingFace and returns a dataloader
+
+    Args:
+        batch_size (int, optional). Defaults to 4.
+
+    Returns:
+        dict[str, DataLoader]
+    """
     # WildJailbreak
     wildjailbreak_eval = load_dataset("allenai/wildjailbreak", "eval")  # 2.21k items
 
@@ -125,7 +162,15 @@ def load_wildjailbreak_data(batch_size: int = 4):
     }
 
 
-def load_or_bench_data(batch_size: int = 4):
+def load_or_bench_test_data(batch_size: int = 4) -> dict[str, DataLoader]:
+    """Loads the test splits for OR-Bench Hard and Toxic from HuggingFace and returns dataloaders for each
+
+    Args:
+        batch_size (int, optional). Defaults to 4.
+
+    Returns:
+        dict[str, DataLoader]
+    """
     # OR-Bench
     or_bench_hard = load_dataset(
         "bench-llm/or-bench", "or-bench-hard-1k"

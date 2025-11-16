@@ -2,37 +2,52 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
-
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.metrics import (
     silhouette_score,
     davies_bouldin_score,
-    calinski_harabasz_score,
 )
 
 
-def evaluate_vector_clusters(
-    steering_vectors_dict,
-    compute_cluster_metrics: bool = True,
+def project_activations_and_evaluate_clusters(
+    activations_dict: dict[str, torch.Tensor],
+    should_compute_cluster_metrics: bool = True,
     tsne_perplexity: int = 5,
     layer: int = 16,
     activation_name: str = "resid_post",
-    desc: str = "",
-):
-    processed = {}
-    for category, vec in steering_vectors_dict.items():
-        arr = vec.detach().cpu().numpy()
-        if arr.ndim == 1:
-            arr = arr[np.newaxis, :]
-        processed[category] = arr
+    desc: str = "2D Projection of Clustered Residual-Stream Activations",
+) -> tuple:
+    """Projects activations in the 4096-dimensional space into 2-dimensions with PCA and t-SNE.
 
-    # Stack all steering vectors and build labels
-    X = np.vstack(list(processed.values()))
+    Also, computes Silhouette Score and Davies-Bouldin Score clustering metrics.
+
+    Args:
+        activations_dict (dict[str, torch.Tensor]): High-dimensional activations separated by category
+        should_compute_cluster_metrics (bool, optional). Defaults to True.
+        tsne_perplexity (int, optional). Defaults to 5.
+        layer (int, optional): Layer to hook at. Defaults to 16.
+        activation_name (str, optional): Position in the layer to hook at. Defaults to "resid_post".
+        desc (str, optional): Decription displayed as part of the title on the PCA and t-SNE plots. Defaults to "2D Projection of Clustered Residual-Stream Activations".
+
+    Returns:
+        tuple: Returns the PCA model, PCA projections, t-SNE model, and t-SNE projections. Also returns the cluster centroids, Silhouette Score, and Davies-Bouldin Score clustering metrics if should_compute_cluster_metrics is True.
+    """
+    numpy_activations_dict = {}
+    for category, activations in activations_dict.items():
+        numpy_activations = activations.detach().cpu().numpy()
+
+        if numpy_activations.ndim == 1:
+            numpy_activations = numpy_activations[None, :]
+
+        numpy_activations_dict[category] = numpy_activations
+
+    # Stack all activations and build labels
+    X = np.vstack(list(numpy_activations_dict.values()))  # (N * 5, 4096)
     labels = []
 
-    for category, steering in processed.items():
-        labels.extend([category] * steering.shape[0])
+    for category, activations in numpy_activations_dict.items():
+        labels.extend([category] * activations.shape[0])
 
     labels = np.array(labels)
 
@@ -41,7 +56,7 @@ def evaluate_vector_clusters(
     pca_projection = pca.fit_transform(X)
 
     plt.figure(figsize=(6, 5))
-    for category in processed:
+    for category in numpy_activations_dict:
         mask = labels == category
         plt.scatter(
             pca_projection[mask, 0], pca_projection[mask, 1], label=category, alpha=0.7
@@ -51,7 +66,7 @@ def evaluate_vector_clusters(
     plt.legend(loc="best", fontsize="small")
     plt.tight_layout()
 
-    plt.savefig(f"PCA - {desc} - {layer} - {activation_name}.png")
+    plt.savefig(f"PCA_{layer}_{activation_name}.png")
     plt.show()
 
     # t-SNE
@@ -59,7 +74,7 @@ def evaluate_vector_clusters(
     tsne_projection = tsne.fit_transform(X)
 
     plt.figure(figsize=(6, 5))
-    for category in processed:
+    for category in numpy_activations_dict:
         mask = labels == category
         plt.scatter(
             tsne_projection[mask, 0],
@@ -72,23 +87,35 @@ def evaluate_vector_clusters(
     plt.legend(loc="best", fontsize="small")
     plt.tight_layout()
 
-    plt.savefig(f"t-SNE - {desc} - {layer} - {activation_name}.png")
+    plt.savefig(f"t-SNE_{layer}_{activation_name}.png")
     plt.show()
 
-    if compute_cluster_metrics:
+    if should_compute_cluster_metrics:
         # Compute cluster centroids
         centroids = {
-            category: steering.mean(axis=0) for category, steering in processed.items()
+            category: steering.mean(axis=0)
+            for category, steering in numpy_activations_dict.items()
         }
 
         # Clustering Metrics
-        sil_score = silhouette_score(X, labels)  # Higher score is better (-1 - +1)
-        db_score = davies_bouldin_score(X, labels)  # Lower score is better (>= 0)
-        ch_score = calinski_harabasz_score(X, labels)  # Higher score is better
+        sil_score = silhouette_score(X, labels)
+        db_score = davies_bouldin_score(X, labels)
+
+        print("Silhouette Score Interpretation - Range: (-1, 1)")
+        print("Value ~1: clusters are dense and well-separated")
+        print("Value ~0: overlapping clusters")
+        print("Value <0: some data points may have been assigned to the wrong cluster")
+
+        print("\n")
+
+        print("Davies-Bouldin Score Interpretation - Range: (0, infinity)")
+        print("Lower score: better clustering")
+        print("Value 0: ideal minimum")
+
+        print("\n\n")
 
         print(f"Silhouette Score: {sil_score}")
         print(f"Davies-Bouldin Score: {db_score}")
-        print(f"Calinski-Harabasz Score: {ch_score}")
 
         return (
             pca,
@@ -98,13 +125,22 @@ def evaluate_vector_clusters(
             centroids,
             sil_score,
             db_score,
-            ch_score,
         )
 
     return pca, pca_projection, tsne, tsne_projection
 
 
-def compute_steering_vector_cosine_similarities(steering_vectors):
+def compute_inter_steering_vector_cosine_sims(
+    steering_vectors: dict[str, torch.Tensor],
+) -> dict[str, dict[str, float]]:
+    """Computes cosine similarities between categorical steering vectors.
+
+    Args:
+        steering_vectors (dict[str, torch.Tensor])
+
+    Returns:
+        dict[str, dict[str, float]]: Computed cosine similarities
+    """
     steering_vector_cosine_similarities = {}
 
     for category_1, steering_vector_1 in steering_vectors.items():
@@ -122,12 +158,16 @@ def compute_steering_vector_cosine_similarities(steering_vectors):
     return steering_vector_cosine_similarities
 
 
-def plot_steering_vector_cosine_sims(
-    steering_vector_cosine_similarities,
-    layer: int = 16,
-    activation_name: str = "resid_post",
-    title: str = "Steering Vector Cosine Similarities",
-):
+def plot_inter_steering_vector_cosine_sims(
+    steering_vector_cosine_similarities: dict[str, dict[str, float]],
+    title: str = "Inter-Steering Vector Cosine Similarities",
+) -> None:
+    """Plots the cosine similarities between categorical steering vectors.
+
+    Args:
+        steering_vector_cosine_similarities (dict[str, dict[str, float]])
+        title (str, optional). Defaults to "Inter-Steering Vector Cosine Similarities".
+    """
     row_labels = list(steering_vector_cosine_similarities.keys())
     col_labels = list(next(iter(steering_vector_cosine_similarities.values())).keys())
 
@@ -181,17 +221,33 @@ def plot_steering_vector_cosine_sims(
     ax.set_title(title)
     fig.tight_layout()
 
-    plt.savefig(f"steering_vector_cos_sim - {layer} - {activation_name}.png")
+    plt.savefig("steering_vector_cos_sim.png")
     plt.show()
 
 
-def get_topk_steering_vector(vector, K: int = 10):
+def get_topk_steering_vector(
+    vector: torch.Tensor, K: int = 10
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Returns the top-K features' values and indices given a vector
+
+    Args:
+        vector (torch.Tensor)
+        K (int, optional). Defaults to 10.
+
+    Returns:
+        tuple[torch.Tensor, torch.Tensor]: top-K values and top-K indices
+    """
     vals, idxs = torch.topk(vector.abs(), K)
     return vals, idxs
 
 
-def print_topk_steering_features(steering_vectors_activations):
-    for category, steering_vector in steering_vectors_activations.items():
+def print_topk_refusal_features(steering_vectors: dict[str, torch.Tensor]) -> None:
+    """Prints the top-K features' values and indices given steering vectors
+
+    Args:
+        steering_vectors (dict[str, torch.Tensor])
+    """
+    for category, steering_vector in steering_vectors.items():
         steering_vector_vals, steering_vector_idxs = get_topk_steering_vector(
             steering_vector, K=10
         )
@@ -201,7 +257,15 @@ def print_topk_steering_features(steering_vectors_activations):
         print(steering_vector_idxs)
 
 
-def plot_steering_vectors_grouped(steering_vectors, feature_ids):
+def plot_grouped_steering_vector_features(
+    steering_vectors: dict[str, torch.Tensor], feature_ids: list[int]
+) -> None:
+    """Plots the values of the given features for all of the steering vectors
+
+    Args:
+        steering_vectors (dict[str, torch.Tensor])
+        feature_ids (list[int])
+    """
     items = list(steering_vectors.items())
     categories = [category for category, steering_vector in items]
 
@@ -248,7 +312,15 @@ def plot_steering_vectors_grouped(steering_vectors, feature_ids):
     plt.show()
 
 
-def plot_steering_vector_feature(steering_vectors, feature_id: int):
+def plot_steering_vector_feature(
+    steering_vectors: dict[str, torch.Tensor], feature_id: int
+) -> None:
+    """Plots the values of the given feature for all of the steering vectors
+
+    Args:
+        steering_vectors (dict[str, torch.Tensor])
+        feature_id (int)
+    """
     items = list(steering_vectors.items())
 
     categories = [category for category, vector in items]

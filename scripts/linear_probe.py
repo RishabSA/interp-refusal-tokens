@@ -11,7 +11,7 @@ class LinearProbe(nn.Module):
 
         self.head = nn.Linear(in_features=d_model, out_features=1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         # x: (B, d_model)
         return self.head(x)  # shape: (B, 1)
 
@@ -34,13 +34,13 @@ class LinearMLPProbe(nn.Module):
             nn.Linear(in_features=hidden_features, out_features=1),
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         # x: (B, d_model)
         return self.layers(x)  # shape: (B, 1)
 
 
 class LowRankProbe(nn.Module):
-    def __init__(self, d_model: int, rank: int, U_r: torch.Tensor):
+    def __init__(self, d_model: int = 4096, rank: int, U_r: torch.Tensor):
         super().__init__()
         # U_r is the tensor of shape (d_model, rank) from PCA
         self.d_model = d_model
@@ -51,7 +51,7 @@ class LowRankProbe(nn.Module):
 
         self.head = nn.Linear(in_features=rank, out_features=1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         # x: (B, d_model)
 
         # Project to rank-r (B, r)
@@ -63,7 +63,7 @@ def load_probe_model(
     path: str = "steering_probe_18.pt",
     d_model: int = 4096,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-):
+) -> tuple[nn.Module, int]:
     # probe_model = LinearProbe(d_model=d_model).to(device)
     probe_model = LinearMLPProbe(d_model=d_model, hidden_features=64).to(device)
 
@@ -75,18 +75,18 @@ def load_probe_model(
 
 
 def get_categorical_steering_vector_probe(
-    steering_vector_mapping,
-    probe_model,
-    probe_threshold,
-    activation_name,
-    layer,
-    device,
-    temperature,
-    prompt,
-    hooked_model,
+    steering_vector_mapping: dict[int, torch.Tensor],
+    prompt: str,
+    hooked_model: HookedTransformer,
+    probe_model: nn.Module,
+    probe_threshold: float = 0.5,
+    activation_name: str = "resid_post",
+    layer: int = 16,
+    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    temperature: float = 1.0,
     benign_strength: float = -4.0,
     harmful_strength: float = 1.0,
-):
+) -> tuple[torch.Tensor, float]:
     token_activation = None
 
     hook_name = get_act_name(activation_name, layer)
@@ -155,12 +155,10 @@ def get_categorical_steering_vector_probe(
         return steering_vector_mapping[top_refusal_token_id], harmful_strength  # 1.0
     else:
         # Benign
-        if respond_prob.item() > 0.8:
-            # print("Benign: None")
-            return None, 0.0
-        else:
-            # print(f"Benign: {top_refusal_token_id}, strength: {benign_strength}")
-            return (
-                steering_vector_mapping[top_refusal_token_id],
-                benign_strength,
-            )  # -4.0
+        # if respond_prob.item() > 0.8:
+        #     # print("Benign: None")
+        #     return None, 0.0
+        # else:
+
+        # print(f"Benign: {top_refusal_token_id}, strength: {benign_strength}")
+        return steering_vector_mapping[top_refusal_token_id], benign_strength  # -4.0

@@ -5,27 +5,33 @@ from functools import partial
 import transformer_lens
 from transformer_lens.utils import get_act_name
 from scripts.eval_data import Counter
+from transformers import (
+    PreTrainedTokenizerBase,
+)
+from transformer_lens import (
+    HookedTransformer,
+)
 
 
 def generate_with_steering(
-    prompt,
-    hooked_model,
-    tokenizer,
-    steering_vector,
+    prompt: str,
+    hooked_model: HookedTransformer,
+    tokenizer: PreTrainedTokenizerBase,
+    steering_vector: torch.Tensor,
     intervention_hook: Callable,
-    get_steering_vector=None,
+    get_steering_vector: Callable = None,
     fixed_strenth: float = 0.0,
     benign_strength: float = -4.0,
     harmful_strength: float = 1.0,
     generate_baseline: bool = False,
     layer: int = 16,
-    activations: list[str] = ["resid_post"],
+    activation_name: str = "resid_post",
     max_new_tokens: int = 512,
     do_sample: bool = True,
     temperature: float = 1.0,
     SEED: int = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-):
+) -> str:
     prompt += "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
 
     stop_ids = [
@@ -38,7 +44,10 @@ def generate_with_steering(
     strength = fixed_strenth
     if steering_vector is None and get_steering_vector is not None:
         steering_vector, strength = get_steering_vector(
-            prompt, hooked_model, benign_strength, harmful_strength
+            prompt=prompt,
+            hooked_model=hooked_model,
+            benign_strength=benign_strength,
+            harmful_strength=harmful_strength,
         )
 
     # Build the forward hooks
@@ -49,24 +58,22 @@ def generate_with_steering(
             hooked_model.cfg.device, dtype=next(hooked_model.parameters()).dtype
         )
 
-        for activation in activations:
-            hook_name = get_act_name(activation, layer)
+        hook_name = get_act_name(activation_name, layer)
 
-            token_limit_gen_counter = Counter()
-            hook_fn = partial(
-                intervention_hook,
-                steering_vector,
-                strength,
-                token_limit_gen_counter,
-                device,
-            )
-            fwd_hooks.append((hook_name, hook_fn))
+        token_limit_gen_counter = Counter()
+        hook_fn = partial(
+            intervention_hook,
+            steering_vector,
+            strength,
+            token_limit_gen_counter,
+            device,
+        )
+        fwd_hooks.append((hook_name, hook_fn))
 
     tokens = hooked_model.to_tokens(prompt).to(device)
 
     with torch.inference_mode(), amp.autocast(device.type, dtype=torch.float16):
         if generate_baseline:
-            # Baseline
             torch.manual_seed(SEED)
             baseline = hooked_model.generate(
                 tokens,
@@ -77,10 +84,12 @@ def generate_with_steering(
                 eos_token_id=stop_ids,
             )
 
-        # Intervened
+            print(f"Baseline: {baseline}\n")
+
+        # Steered
         with hooked_model.hooks(fwd_hooks):
             torch.manual_seed(SEED)
-            intervened = hooked_model.generate(
+            steered = hooked_model.generate(
                 tokens,
                 max_new_tokens=max_new_tokens,
                 do_sample=do_sample,
@@ -92,15 +101,12 @@ def generate_with_steering(
 
     hooked_model.reset_hooks()
 
-    if generate_baseline:
-        return baseline, intervened
-
-    return intervened
+    return steered
 
 
 def steering_hook_activations(
-    steering_vector, strength, counter, device, activation, hook
-):
+    steering_vector: torch.Tensor, strength, counter, device, activation, hook
+) -> torch.Tensor:
     # A positive value of strength increases the category-specific refusal behavior
     # A negative value of strength decreases the category-specific refusal behavior
 
@@ -112,21 +118,21 @@ def steering_hook_activations(
         batch_size, seq_len, d_model = activation.shape
         out = activation.clone()
 
-        sv = steering_vector
-        sv = sv.to(device)
+        vector = steering_vector.to(device)
 
-        if sv.ndim == 1:
-            sv = sv.view(1, d_model).expand(batch_size, d_model)
-        elif sv.ndim == 2:
-            assert sv.shape == (
+        if vector.ndim == 1:
+            # Expand the steering vector to 2D to apply for the batch
+            vector = vector.unsqueeze(dim=0).expand(batch_size, d_model)
+        elif vector.ndim == 2:
+            assert vector.shape == (
                 batch_size,
                 d_model,
-            ), f"steering_vector must be (d_model,) or (batch_size, d_model), got {sv.shape}"
+            ), f"steering_vector must be (d_model,) or (batch_size, d_model), got {vector.shape}"
         else:
             raise ValueError("steering_vector must be 1D or 2D")
 
-        # Add steering at the target token position
-        out[:, -1, :] = out[:, -1, :] + strength * sv
+        # Add steering at the last token position
+        out[:, -1, :] = out[:, -1, :] + strength * vector
 
         counter.count += 1
         return out

@@ -7,6 +7,9 @@ from torch.utils.data import (
 )
 from datasets import load_dataset, concatenate_datasets
 from sklearn.model_selection import train_test_split
+from transformer_lens import (
+    HookedTransformer,
+)
 
 from scripts.activation_caching import cache_hooked_activations_before_pad
 
@@ -22,12 +25,14 @@ class ActivationDataset(Dataset):
     def __len__(self):
         return self.X.shape[0]
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int):
         return self.X[i], self.y[i]
 
 
-def get_probe_prompt_training_data(batch_size: int = 4):
-    def prompt_category_collate(batch):
+def get_probe_prompt_training_data(
+    batch_size: int = 4,
+) -> tuple[DataLoader, DataLoader]:
+    def prompt_category_collate(batch: list[dict]) -> dict[str, list[str]]:
         return {
             "prompt": [sample["prompt"] for sample in batch],
         }
@@ -107,7 +112,7 @@ def get_probe_prompt_training_data(batch_size: int = 4):
     return harmful_probe_dataloader, benign_probe_dataloader
 
 
-def get_probe_prompt_testing_data(batch_size: int = 4):
+def get_probe_prompt_testing_data(batch_size: int = 4) -> tuple[DataLoader, DataLoader]:
     def prompt_category_collate(batch):
         return {
             "prompt": [sample["prompt"] for sample in batch],
@@ -202,15 +207,15 @@ def get_probe_prompt_testing_data(batch_size: int = 4):
 
 
 def get_probe_training_activations(
-    hooked_model,
-    harmful_probe_dataloader,
-    benign_probe_dataloader,
+    hooked_model: HookedTransformer,
+    harmful_probe_dataloader: DataLoader,
+    benign_probe_dataloader: DataLoader,
     layer: int = 18,
     activation_name: str = "resid_post",
     batch_size: int = 512,
     val_split: float = 0.2,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-):
+) -> tuple[DataLoader, DataLoader]:
     hooked_model.to(device).eval()
 
     harmful_probe_activations, _ = cache_hooked_activations_before_pad(
@@ -282,14 +287,14 @@ def get_probe_training_activations(
 
 
 def get_probe_testing_activations(
-    hooked_model,
-    harmful_probe_dataloader,
-    benign_probe_dataloader,
+    hooked_model: HookedTransformer,
+    harmful_probe_dataloader: DataLoader,
+    benign_probe_dataloader: DataLoader,
     layer: int = 18,
     activation_name: str = "resid_post",
     batch_size: int = 512,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-):
+) -> DataLoader:
     hooked_model.to(device).eval()
 
     harmful_probe_activations, _ = cache_hooked_activations_before_pad(
