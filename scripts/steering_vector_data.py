@@ -4,12 +4,8 @@ from pathlib import Path
 from torch.utils.data import DataLoader, Dataset
 from datasets import load_dataset, concatenate_datasets
 import torch
-from transformers import (
-    AutoTokenizer,
-)
-from transformer_lens import (
-    HookedTransformer,
-)
+from transformers import AutoTokenizer
+from transformer_lens import HookedTransformer
 
 from scripts.hooked_model import generate_hooked_model_response
 
@@ -261,7 +257,7 @@ def get_synthetic_steering_vector_data(
 def print_synthetic_pairs(
     hooked_model: HookedTransformer,
     tokenizer: AutoTokenizer,
-    SEED: int = 42,
+    SEED: int | None = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> None:
     data_path = Path("/workspace/refusal_dataset.json")

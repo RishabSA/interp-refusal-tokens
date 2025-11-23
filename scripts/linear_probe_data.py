@@ -7,9 +7,7 @@ from torch.utils.data import (
 )
 from datasets import load_dataset, concatenate_datasets
 from sklearn.model_selection import train_test_split
-from transformer_lens import (
-    HookedTransformer,
-)
+from transformer_lens import HookedTransformer
 
 from scripts.activation_caching import cache_hooked_activations_before_pad
 
@@ -212,6 +210,7 @@ def get_probe_training_activations(
     benign_probe_dataloader: DataLoader,
     layer: int = 18,
     activation_name: str = "resid_post",
+    prompt_seq_append: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
     batch_size: int = 512,
     val_split: float = 0.2,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -223,8 +222,7 @@ def get_probe_training_activations(
         iterator=harmful_probe_dataloader,
         activation_name=activation_name,
         layer=layer,
-        # prompt_seq_append="<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
-        prompt_seq_append="",
+        prompt_seq_append=prompt_seq_append,
         device=device,
     )  # (N_h, d_model)
 
@@ -233,8 +231,7 @@ def get_probe_training_activations(
         iterator=benign_probe_dataloader,
         activation_name=activation_name,
         layer=layer,
-        # prompt_seq_append="<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
-        prompt_seq_append="",
+        prompt_seq_append=prompt_seq_append,
         device=device,
     )  # (N_b, d_model)
 
@@ -292,6 +289,7 @@ def get_probe_testing_activations(
     benign_probe_dataloader: DataLoader,
     layer: int = 18,
     activation_name: str = "resid_post",
+    prompt_seq_append: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
     batch_size: int = 512,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> DataLoader:
@@ -302,8 +300,7 @@ def get_probe_testing_activations(
         iterator=harmful_probe_dataloader,
         activation_name=activation_name,
         layer=layer,
-        # prompt_seq_append="<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
-        prompt_seq_append="",
+        prompt_seq_append=prompt_seq_append,
         device=device,
     )  # (N_h, d_model)
 
@@ -312,8 +309,7 @@ def get_probe_testing_activations(
         iterator=benign_probe_dataloader,
         activation_name=activation_name,
         layer=layer,
-        # prompt_seq_append="<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
-        prompt_seq_append="",
+        prompt_seq_append=prompt_seq_append,
         device=device,
     )  # (N_b, d_model)
 

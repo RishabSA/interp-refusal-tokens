@@ -9,9 +9,7 @@ from torch import amp
 from functools import partial
 import uuid
 from torch.utils.data import DataLoader
-from transformer_lens import (
-    HookedTransformer,
-)
+from transformer_lens import HookedTransformer
 from transformers import LlamaForCausalLM, PreTrainedTokenizerBase
 from transformer_lens.utils import get_act_name
 from openai import OpenAI
@@ -56,20 +54,21 @@ def generate_outputs_dataset(
     tokenizer: PreTrainedTokenizerBase,
     iterator: DataLoader,
     steering_vector: torch.Tensor = None,
-    fixed_strenth: float = 0.0,
-    benign_strength: float = -4.0,
-    harmful_strength: float = 1.0,
+    fixed_strength: float | None = None,
+    benign_strength: float | None = -4.0,
+    harmful_strength: float | None = 1.0,
     get_steering_vector: Callable | None = None,
     intervention_hook: Callable | None = None,
     layer: int | None = None,
     activation_name: str | None = None,
     description: str = "Evaluation",
     max_new_tokens: int = 512,
-    do_sample: bool = True,
+    do_sample: bool = False,
     temperature: float = 1.0,
+    append_seq: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
     outputs_save_path: str = "dataset_outputs.jsonl",
     model_name: str = "categorical-refusal",
-    SEED: int = 42,
+    SEED: int | None = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> list[dict[str, str]]:
     if tokenizer.pad_token_id is None:
@@ -96,38 +95,52 @@ def generate_outputs_dataset(
     model_outputs = []
 
     with torch.inference_mode(), amp.autocast(device.type, dtype=torch.float16):
+        # if SEED is not None:
+        #     torch.manual_seed(SEED)
+
         for batch in tqdm(iterator, desc=description):
             try:
-                # Prepare the batch
                 prompts, categories = batch["prompt"], batch["category"]
-
-                prompts = [
-                    prompt
-                    + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
-                    for prompt in prompts
-                ]
+                prompts = [prompt + append_seq for prompt in prompts]
 
                 if intervention_hook is not None:
                     tokens = model.to_tokens(prompts).to(device)
 
                     steer_batch = steering_vector
-                    strength = fixed_strenth
+                    strength = fixed_strength
 
-                    if get_steering_vector is not None:
+                    if steering_vector is None and get_steering_vector is not None:
                         batch_steering_vectors = []
 
                         for prompt in prompts:
-                            vec, strength = get_steering_vector(
-                                prompt=prompt,
-                                hooked_model=model,
-                                benign_strength=benign_strength,
-                                harmful_strength=harmful_strength,
-                            )
+                            if fixed_strength is not None:
+                                vector, strength = get_steering_vector(
+                                    prompt=prompt,
+                                    hooked_model=model,
+                                    benign_strength=fixed_strength,
+                                    harmful_strength=fixed_strength,
+                                )
+                            elif (
+                                benign_strength is not None
+                                and harmful_strength is not None
+                            ):
+                                vector, strength = get_steering_vector(
+                                    prompt=prompt,
+                                    hooked_model=model,
+                                    benign_strength=benign_strength,
+                                    harmful_strength=harmful_strength,
+                                )
+                            else:
+                                raise Exception(
+                                    "You must pass in values for either fixed_strength or benign_strength and harmful_strength"
+                                )
 
-                            if vec is None:
+                            if vector is None:
                                 batch_steering_vectors.append(None)
                             else:
-                                batch_steering_vectors.append(vec.detach().to(device))
+                                batch_steering_vectors.append(
+                                    vector.detach().to(device)
+                                )
 
                         # Turn Nones into zeros of the right size
                         D = (
@@ -162,7 +175,9 @@ def generate_outputs_dataset(
                         fwd_hooks.append((hook_name, hook_fn))
 
                     with model.hooks(fwd_hooks):
-                        torch.manual_seed(SEED)
+                        # if SEED is not None:
+                        #     torch.manual_seed(SEED)
+
                         sequences = model.generate(
                             tokens,
                             max_new_tokens=max_new_tokens,
@@ -180,7 +195,9 @@ def generate_outputs_dataset(
                     if is_hooked:
                         tokens = model.to_tokens(prompts).to(device)
 
-                        torch.manual_seed(SEED)
+                        # if SEED is not None:
+                        #     torch.manual_seed(SEED)
+
                         sequences = model.generate(
                             tokens,
                             max_new_tokens=max_new_tokens,
@@ -197,7 +214,9 @@ def generate_outputs_dataset(
                             prompts, padding=True, truncation=True, return_tensors="pt"
                         ).to(device)
 
-                        torch.manual_seed(SEED)
+                        # if SEED is not None:
+                        #     torch.manual_seed(SEED)
+
                         out = model.generate(
                             input_ids=inputs.input_ids,
                             attention_mask=inputs.attention_mask,
@@ -221,7 +240,10 @@ def generate_outputs_dataset(
                 if len(prompts) == 1:
                     model_outputs.append(
                         make_response_object(
-                            model_name, categories[0], prompts[0], sequences
+                            model_name,
+                            categories[0],
+                            prompts[0],
+                            (sequences if is_hooked else sequences[0]),
                         )
                     )
                 else:
@@ -234,7 +256,6 @@ def generate_outputs_dataset(
 
             except Exception as e:
                 print(f"Error in batch: {e}")
-                continue
 
     # Save model outputs to .jsonl file
     pd.DataFrame(model_outputs).to_json(
@@ -365,7 +386,7 @@ def get_dataset_metrics_grid_search_strength(
     get_categorical_steering_vector_probe_activations_hook: Callable,
     layer: int = 16,
     model_name: str = "categorical-refusal",
-    SEED: int = 42,
+    SEED: int | None = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> list[float]:
     results = []
@@ -428,7 +449,7 @@ def get_dataset_metrics_grid_search_layer(
     probe_threshold: float,
     layer: int = 16,
     model_name: str = "categorical-refusal",
-    SEED: int = 42,
+    SEED: int | None = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> list[tuple[int, float]]:
     results = []

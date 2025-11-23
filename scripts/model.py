@@ -33,9 +33,9 @@ def generate_model_response(
     append_seq: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
     stop_tokens: list[str] = ["<|eot_id|>"],
     max_new_tokens: int = 512,
-    do_sample: bool = True,
+    do_sample: bool = False,
     temperature: float = 1.0,
-    SEED: int = 42,
+    SEED: int | None = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> str:
     stop_ids = [
@@ -48,7 +48,9 @@ def generate_model_response(
         full_prompt, padding=True, truncation=True, return_tensors="pt"
     ).to(device)
 
-    torch.manual_seed(SEED)
+    # if SEED is not None:
+    #     torch.manual_seed(SEED)
+
     out = model.generate(
         input_ids=inputs.input_ids,
         attention_mask=inputs.attention_mask,

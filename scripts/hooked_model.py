@@ -5,9 +5,7 @@ from transformers import (
     LlamaForCausalLM,
     PreTrainedTokenizerBase,
 )
-from transformer_lens import (
-    HookedTransformer,
-)
+from transformer_lens import HookedTransformer
 
 
 def load_hooked_model(
@@ -51,9 +49,9 @@ def generate_hooked_model_response(
     append_seq: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
     stop_tokens: list[str] = ["<|eot_id|>"],
     max_new_tokens: int = 512,
-    do_sample: bool = True,
+    do_sample: bool = False,
     temperature: float = 1.0,
-    SEED: int = 42,
+    SEED: int | None = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> str:
     stop_ids = [
@@ -64,7 +62,9 @@ def generate_hooked_model_response(
 
     tokens = hooked_model.to_tokens(full_prompt).to(device)
 
-    torch.manual_seed(SEED)
+    # if SEED is not None:
+    #     torch.manual_seed(SEED)
+
     sequence = hooked_model.generate(
         tokens,
         max_new_tokens=max_new_tokens,

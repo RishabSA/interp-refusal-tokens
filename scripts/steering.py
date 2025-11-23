@@ -2,15 +2,10 @@ from typing import Callable
 import torch
 from torch import amp
 from functools import partial
-import transformer_lens
 from transformer_lens.utils import get_act_name
 from scripts.eval_data import Counter
-from transformers import (
-    PreTrainedTokenizerBase,
-)
-from transformer_lens import (
-    HookedTransformer,
-)
+from transformers import PreTrainedTokenizerBase
+from transformer_lens import HookedTransformer
 
 
 def generate_with_steering(
@@ -20,19 +15,20 @@ def generate_with_steering(
     steering_vector: torch.Tensor,
     intervention_hook: Callable,
     get_steering_vector: Callable = None,
-    fixed_strenth: float = 0.0,
-    benign_strength: float = -4.0,
-    harmful_strength: float = 1.0,
+    fixed_strength: float | None = None,
+    benign_strength: float | None = -4.0,
+    harmful_strength: float | None = 1.0,
     generate_baseline: bool = False,
     layer: int = 16,
     activation_name: str = "resid_post",
     max_new_tokens: int = 512,
-    do_sample: bool = True,
+    do_sample: bool = False,
     temperature: float = 1.0,
-    SEED: int = 42,
+    append_seq: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+    SEED: int | None = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> str:
-    prompt += "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+    prompt += append_seq
 
     stop_ids = [
         tokenizer.eos_token_id,
@@ -41,14 +37,27 @@ def generate_with_steering(
 
     hooked_model.reset_hooks()
 
-    strength = fixed_strenth
+    strength = fixed_strength
+
     if steering_vector is None and get_steering_vector is not None:
-        steering_vector, strength = get_steering_vector(
-            prompt=prompt,
-            hooked_model=hooked_model,
-            benign_strength=benign_strength,
-            harmful_strength=harmful_strength,
-        )
+        if fixed_strength is not None:
+            steering_vector, strength = get_steering_vector(
+                prompt=prompt,
+                hooked_model=hooked_model,
+                benign_strength=fixed_strength,
+                harmful_strength=fixed_strength,
+            )
+        elif benign_strength is not None and harmful_strength is not None:
+            steering_vector, strength = get_steering_vector(
+                prompt=prompt,
+                hooked_model=hooked_model,
+                benign_strength=benign_strength,
+                harmful_strength=harmful_strength,
+            )
+        else:
+            raise Exception(
+                "You must pass in values for either fixed_strength or benign_strength and harmful_strength"
+            )
 
     # Build the forward hooks
     fwd_hooks = []
@@ -74,7 +83,9 @@ def generate_with_steering(
 
     with torch.inference_mode(), amp.autocast(device.type, dtype=torch.float16):
         if generate_baseline:
-            torch.manual_seed(SEED)
+            # if SEED is not None:
+            #     torch.manual_seed(SEED)
+
             baseline = hooked_model.generate(
                 tokens,
                 max_new_tokens=max_new_tokens,
@@ -88,7 +99,9 @@ def generate_with_steering(
 
         # Steered
         with hooked_model.hooks(fwd_hooks):
-            torch.manual_seed(SEED)
+            # if SEED is not None:
+            #     torch.manual_seed(SEED)
+
             steered = hooked_model.generate(
                 tokens,
                 max_new_tokens=max_new_tokens,
@@ -139,3 +152,43 @@ def steering_hook_activations(
 
     counter.count += 1
     return activation
+
+
+def get_categorical_steering_vector_old(
+    prompt: str,
+    hooked_model: HookedTransformer,
+    benign_strength: float,
+    harmful_strength: float,
+    steering_vector_mapping: dict[int, torch.Tensor],
+    append_seq: str = "",
+    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+) -> tuple[torch.Tensor, float]:
+    # Seperate strength variables for function call consistency
+    assert (
+        benign_strength == harmful_strength
+    ), "benign_strength and harmful_strength must have the same value"
+
+    full_prompt = prompt + append_seq
+
+    tokens = hooked_model.to_tokens(full_prompt)
+
+    with torch.inference_mode(), amp.autocast(device.type, dtype=torch.float16):
+        sequences = hooked_model.generate(tokens, max_new_tokens=50, do_sample=False)
+
+    # [128256, 128257, 128258, 128259, 128260]
+    refusal_token_ids = list(steering_vector_mapping.keys())
+
+    generated_sequence = [
+        token for sequence in sequences.tolist() for token in sequence
+    ]
+
+    chosen_steering_vector = None
+
+    for token_id in refusal_token_ids:
+        if token_id in generated_sequence:
+            print(f"Chosen steering vector token id: {token_id}")
+
+            chosen_steering_vector = steering_vector_mapping[token_id]
+            break
+
+    return chosen_steering_vector, benign_strength

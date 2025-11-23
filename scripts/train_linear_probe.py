@@ -57,6 +57,7 @@ def compute_mean(train_probe_dataloader: DataLoader) -> torch.Tensor:
 
 
 def train_steering_linear_probe(
+    probe_model: nn.Module,
     train_probe_dataloader: DataLoader,
     val_probe_dataloader: DataLoader,
     test_probe_dataloader: DataLoader,
@@ -71,11 +72,6 @@ def train_steering_linear_probe(
 ) -> tuple[nn.Module, float, float, float, float]:
     X_mean = compute_mean(train_probe_dataloader)
     X_mean = X_mean.to(device)
-
-    # probe_model = LinearProbe(d_model=d_model).to(device)
-    probe_model = LinearMLPProbe(d_model=d_model, hidden_features=64, p_dropout=0.1).to(
-        device
-    )
 
     optimizer = optim.AdamW(
         params=probe_model.parameters(), lr=lr, weight_decay=weight_decay
@@ -343,7 +339,7 @@ def train_steering_low_rank_probe(
     )
     X_mean = X_mean.to(device)
 
-    probe_model = LowRankProbe(d_model=d_model, rank=rank, U_r=U_r.to(device)).to(
+    probe_model = LowRankProbe(U_r=U_r.to(device), d_model=d_model, rank=rank).to(
         device
     )
     optimizer = optim.AdamW(

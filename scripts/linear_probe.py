@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import transformer_lens
 from transformer_lens.utils import get_act_name
+from transformer_lens import HookedTransformer
 
 
 class LinearProbe(nn.Module):
@@ -40,7 +40,7 @@ class LinearMLPProbe(nn.Module):
 
 
 class LowRankProbe(nn.Module):
-    def __init__(self, d_model: int = 4096, rank: int, U_r: torch.Tensor):
+    def __init__(self, U_r: torch.Tensor, d_model: int = 4096, rank: int = 64):
         super().__init__()
         # U_r is the tensor of shape (d_model, rank) from PCA
         self.d_model = d_model
@@ -75,17 +75,17 @@ def load_probe_model(
 
 
 def get_categorical_steering_vector_probe(
-    steering_vector_mapping: dict[int, torch.Tensor],
     prompt: str,
     hooked_model: HookedTransformer,
+    benign_strength: float,
+    harmful_strength: float,
+    steering_vector_mapping: dict[int, torch.Tensor],
     probe_model: nn.Module,
     probe_threshold: float = 0.5,
     activation_name: str = "resid_post",
     layer: int = 16,
-    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     temperature: float = 1.0,
-    benign_strength: float = -4.0,
-    harmful_strength: float = 1.0,
+    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> tuple[torch.Tensor, float]:
     token_activation = None
 
@@ -152,7 +152,7 @@ def get_categorical_steering_vector_probe(
     if harmful_decision:
         # Harmful
         # print(f"Harmful: {top_refusal_token_id}, strength: {harmful_strength}")
-        return steering_vector_mapping[top_refusal_token_id], harmful_strength  # 1.0
+        return steering_vector_mapping[top_refusal_token_id], harmful_strength
     else:
         # Benign
         # if respond_prob.item() > 0.8:
@@ -161,4 +161,4 @@ def get_categorical_steering_vector_probe(
         # else:
 
         # print(f"Benign: {top_refusal_token_id}, strength: {benign_strength}")
-        return steering_vector_mapping[top_refusal_token_id], benign_strength  # -4.0
+        return steering_vector_mapping[top_refusal_token_id], benign_strength

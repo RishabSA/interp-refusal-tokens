@@ -1,12 +1,8 @@
 import torch
 from torch import amp
 from transformer_lens.utils import get_act_name
-from transformer_lens import (
-    HookedTransformer,
-)
-from transformers import (
-    PreTrainedTokenizerBase,
-)
+from transformer_lens import HookedTransformer
+from transformers import PreTrainedTokenizerBase
 
 
 def generate_with_activation_patching(
@@ -20,7 +16,7 @@ def generate_with_activation_patching(
     activation_name: str = "resid_post",
     max_new_tokens: int = 200,
     do_sample: bool = False,
-    SEED: int = 42,
+    SEED: int | None = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> str:
     hooked_model.reset_hooks()
@@ -57,7 +53,9 @@ def generate_with_activation_patching(
 
     with torch.inference_mode(), amp.autocast(device.type, dtype=torch.float16):
         if generate_baseline:
-            torch.manual_seed(SEED)
+            # if SEED is not None:
+            #     torch.manual_seed(SEED)
+
             baseline = hooked_model.generate(
                 corrupt_tokens,
                 max_new_tokens=max_new_tokens,
@@ -71,7 +69,9 @@ def generate_with_activation_patching(
 
         # Re-generate with the hook
         with hooked_model.hooks(fwd_hooks):
-            torch.manual_seed(SEED)
+            # if SEED is not None:
+            #     torch.manual_seed(SEED)
+
             patched = hooked_model.generate(
                 corrupt_tokens,
                 max_new_tokens=max_new_tokens,
