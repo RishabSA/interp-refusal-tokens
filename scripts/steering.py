@@ -19,13 +19,12 @@ def generate_with_steering(
     benign_strength: float | None = -4.0,
     harmful_strength: float | None = 1.0,
     generate_baseline: bool = False,
-    layer: int = 16,
+    layer: int = 18,
     activation_name: str = "resid_post",
     max_new_tokens: int = 512,
     do_sample: bool = False,
     temperature: float = 1.0,
     append_seq: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
-    SEED: int | None = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> str:
     prompt += append_seq
@@ -83,9 +82,6 @@ def generate_with_steering(
 
     with torch.inference_mode(), amp.autocast(device.type, dtype=torch.float16):
         if generate_baseline:
-            # if SEED is not None:
-            #     torch.manual_seed(SEED)
-
             baseline = hooked_model.generate(
                 tokens,
                 max_new_tokens=max_new_tokens,
@@ -99,9 +95,6 @@ def generate_with_steering(
 
         # Steered
         with hooked_model.hooks(fwd_hooks):
-            # if SEED is not None:
-            #     torch.manual_seed(SEED)
-
             steered = hooked_model.generate(
                 tokens,
                 max_new_tokens=max_new_tokens,

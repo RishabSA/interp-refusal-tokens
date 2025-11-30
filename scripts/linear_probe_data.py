@@ -13,6 +13,12 @@ from scripts.activation_caching import cache_hooked_activations_before_pad
 
 
 class ActivationDataset(Dataset):
+    """Stores cached activations used for training the linear probe.
+
+    Args:
+        Dataset (_type_)
+    """
+
     def __init__(self, X, y):
         # X shape: (N, d_model)
         # y shape: (N) (0 - benign / 1 - harmful)
@@ -30,6 +36,15 @@ class ActivationDataset(Dataset):
 def get_probe_prompt_training_data(
     batch_size: int = 4,
 ) -> tuple[DataLoader, DataLoader]:
+    """Get dataloaders containing prompts used for training a linear probe.
+
+    Args:
+        batch_size (int, optional). Defaults to 4.
+
+    Returns:
+        tuple[DataLoader, DataLoader]: Dataloaders containing harmful and benign prompts used for training a linear probe.
+    """
+
     def prompt_category_collate(batch: list[dict]) -> dict[str, list[str]]:
         return {
             "prompt": [sample["prompt"] for sample in batch],
@@ -111,6 +126,15 @@ def get_probe_prompt_training_data(
 
 
 def get_probe_prompt_testing_data(batch_size: int = 4) -> tuple[DataLoader, DataLoader]:
+    """Get dataloaders containing prompts used for testing a linear probe.
+
+    Args:
+        batch_size (int, optional). Defaults to 4.
+
+    Returns:
+        tuple[DataLoader, DataLoader]: Dataloaders containing harmful and benign prompts used for testing a linear probe.
+    """
+
     def prompt_category_collate(batch):
         return {
             "prompt": [sample["prompt"] for sample in batch],
@@ -215,6 +239,22 @@ def get_probe_training_activations(
     val_split: float = 0.2,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> tuple[DataLoader, DataLoader]:
+    """Given dataloaders containg harmful and benign prompts, caches activations at the specific position in the hooked model and saves them in new dataloaders used for training and validating the linear probe.
+
+    Args:
+        hooked_model (HookedTransformer)
+        harmful_probe_dataloader (DataLoader)
+        benign_probe_dataloader (DataLoader)
+        layer (int, optional). Defaults to 18.
+        activation_name (str, optional). Defaults to "resid_post".
+        prompt_seq_append (str, optional). Defaults to "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n".
+        batch_size (int, optional). Defaults to 512.
+        val_split (float, optional). Defaults to 0.2.
+        device (torch.device, optional). Defaults to torch.device("cuda" if torch.cuda.is_available() else "cpu").
+
+    Returns:
+        tuple[DataLoader, DataLoader]: Dataloaders containing activations for training and validating the linear probe.
+    """
     hooked_model.to(device).eval()
 
     harmful_probe_activations, _ = cache_hooked_activations_before_pad(
@@ -293,6 +333,21 @@ def get_probe_testing_activations(
     batch_size: int = 512,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> DataLoader:
+    """Given dataloaders containg harmful and benign prompts, caches activations at the specific position in the hooked model and saves them in new dataloaders used for testing the linear probe.
+
+    Args:
+        hooked_model (HookedTransformer)
+        harmful_probe_dataloader (DataLoader)
+        benign_probe_dataloader (DataLoader)
+        layer (int, optional). Defaults to 18.
+        activation_name (str, optional). Defaults to "resid_post".
+        prompt_seq_append (str, optional). Defaults to "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n".
+        batch_size (int, optional). Defaults to 512.
+        device (torch.device, optional). Defaults to torch.device("cuda" if torch.cuda.is_available() else "cpu").
+
+    Returns:
+        DataLoader: Dataloader containing activations for testing the linear probe.
+    """
     hooked_model.to(device).eval()
 
     harmful_probe_activations, _ = cache_hooked_activations_before_pad(

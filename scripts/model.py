@@ -6,6 +6,14 @@ from transformers import AutoTokenizer, LlamaForCausalLM, PreTrainedTokenizerBas
 def load_model(
     model_id: str = "tomg-group-umd/zephyr-llama3-8b-sft-refusal-n-contrast-multiple-tokens",
 ) -> tuple[LlamaForCausalLM, PreTrainedTokenizerBase]:
+    """Loads a Llama language model from HuggingFace given the model_id.
+
+    Args:
+        model_id (str, optional). Defaults to "tomg-group-umd/zephyr-llama3-8b-sft-refusal-n-contrast-multiple-tokens".
+
+    Returns:
+        tuple[LlamaForCausalLM, PreTrainedTokenizerBase]: Returns the model and tokenizer.
+    """
     start_time = time.time()
 
     tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -35,21 +43,16 @@ def generate_model_response(
     max_new_tokens: int = 512,
     do_sample: bool = False,
     temperature: float = 1.0,
-    SEED: int | None = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> str:
-    stop_ids = [
-        tokenizer.eos_token_id,
-    ].extend([tokenizer.convert_tokens_to_ids(token) for token in stop_tokens])
+    stop_ids = [tokenizer.eos_token_id]
+    stop_ids.extend([tokenizer.convert_tokens_to_ids(token) for token in stop_tokens])
 
     full_prompt = prompt + append_seq
 
     inputs = tokenizer(
         full_prompt, padding=True, truncation=True, return_tensors="pt"
     ).to(device)
-
-    # if SEED is not None:
-    #     torch.manual_seed(SEED)
 
     out = model.generate(
         input_ids=inputs.input_ids,

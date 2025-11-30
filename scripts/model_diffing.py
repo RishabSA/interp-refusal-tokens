@@ -19,7 +19,9 @@ def compute_model_diffing_cosine_sims(
         steering_cosine_sim = F.cosine_similarity(
             steering_vector, steering_vector_llama, dim=-1, eps=1e-8
         )
-        print(f"{category} has a cosine similarity of {steering_cosine_sim}")
+        print(
+            f"{category} steering vectors from llama and fine-tuned have a cosine similarity of {steering_cosine_sim}"
+        )
         model_diffing_cosine_sims[category] = float(steering_cosine_sim.detach().cpu())
 
     return model_diffing_cosine_sims

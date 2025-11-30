@@ -1,4 +1,7 @@
 papers/
+saved_outputs/layer_sweep
+
+*.pem
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

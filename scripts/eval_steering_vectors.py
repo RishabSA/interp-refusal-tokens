@@ -14,7 +14,7 @@ def project_activations_and_evaluate_clusters(
     activations_dict: dict[str, torch.Tensor],
     should_compute_cluster_metrics: bool = True,
     tsne_perplexity: int = 5,
-    layer: int = 16,
+    layer: int = 18,
     activation_name: str = "resid_post",
     desc: str = "2D Projection of Clustered Residual-Stream Activations",
 ) -> tuple:
@@ -26,7 +26,7 @@ def project_activations_and_evaluate_clusters(
         activations_dict (dict[str, torch.Tensor]): High-dimensional activations separated by category
         should_compute_cluster_metrics (bool, optional). Defaults to True.
         tsne_perplexity (int, optional). Defaults to 5.
-        layer (int, optional): Layer to hook at. Defaults to 16.
+        layer (int, optional): Layer to hook at. Defaults to 18.
         activation_name (str, optional): Position in the layer to hook at. Defaults to "resid_post".
         desc (str, optional): Decription displayed as part of the title on the PCA and t-SNE plots. Defaults to "2D Projection of Clustered Residual-Stream Activations".
 

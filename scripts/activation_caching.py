@@ -1,4 +1,4 @@
-from tqdm.notebook import tqdm
+from tqdm.auto import tqdm
 import torch
 from transformer_lens import HookedTransformer
 from transformer_lens.utils import get_act_name
@@ -9,7 +9,7 @@ def cache_hooked_activations_before_pad(
     hooked_model: HookedTransformer,
     iterator: DataLoader,
     activation_name: str = "resid_post",
-    layer: int = 16,
+    layer: int = 18,
     prompt_seq_append: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -21,7 +21,7 @@ def cache_hooked_activations_before_pad(
         hooked_model (HookedTransformer)
         iterator (DataLoader)
         activation_name (str, optional): Position in the layer to hook at. Defaults to "resid_post".
-        layer (int, optional): Layer to hook at. Defaults to 16.
+        layer (int, optional): Layer to hook at. Defaults to 18.
         prompt_seq_append (str, optional): Sequence to append to all prompts before caching the activation of the last non-pad token. Defaults to "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n".
         device (torch.device, optional). Defaults to torch.device("cuda" if torch.cuda.is_available() else "cpu").
 
@@ -84,7 +84,7 @@ def cache_hooked_activations_last_token(
     hooked_model: HookedTransformer,
     iterator: DataLoader,
     activation_name: str = "resid_post",
-    layer: int = 16,
+    layer: int = 18,
     prompt_seq_append: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -96,7 +96,7 @@ def cache_hooked_activations_last_token(
         hooked_model (HookedTransformer)
         iterator (DataLoader)
         activation_name (str, optional): Position in the layer to hook at. Defaults to "resid_post".
-        layer (int, optional): Layer to hook at. Defaults to 16.
+        layer (int, optional): Layer to hook at. Defaults to 18.
         prompt_seq_append (str, optional): Sequence to append to all prompts before caching the activation of the last non-pad token. Defaults to "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n".
         device (torch.device, optional). Defaults to torch.device("cuda" if torch.cuda.is_available() else "cpu").
 

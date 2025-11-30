@@ -12,6 +12,7 @@ from scripts.hooked_model import generate_hooked_model_response
 
 def get_contrast_steering_vector_data(
     batch_size: int = 4,
+    should_append: bool = True,
 ) -> tuple[dict[str, DataLoader], dict[str, DataLoader]]:
     # COCONot Dataset loading
     coconot_orig = load_dataset("allenai/coconot", "original")  # 12.5k items
@@ -50,18 +51,19 @@ def get_contrast_steering_vector_data(
             harmful_item = dict(item)
             benign_item = dict(item)
 
-            # harmful_item["prompt"] += (
-            #     "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n "
-            #     + f"[{category}]"
-            # )
+            if should_append:
+                # harmful_item["prompt"] += (
+                #     "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n "
+                #     + f"[{category}]"
+                # )
 
-            harmful_item["prompt"] += f" [{category}]"
+                harmful_item["prompt"] += f" [{category}]"
 
-            # benign_item[
-            #     "prompt"
-            # ] += "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n [respond]"
+                # benign_item[
+                #     "prompt"
+                # ] += "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n [respond]"
 
-            benign_item["prompt"] += " [respond]"
+                benign_item["prompt"] += " [respond]"
 
             harmful_categorical_pair_prompts.append(harmful_item)
             benign_categorical_pair_prompts.append(benign_item)
@@ -140,17 +142,107 @@ def get_old_steering_vector_data(
             collate_fn=prompt_category_collate,
         )
 
-        # Filter the contrast test dataset
-        # benign_category_dataset = coconot_contrast["test"].filter(lambda x, c=category: x["category"] == c)
-        # benign_category_dataset = coconot_contrast["test"]
-
-        # benign_wildguard_dataset = wildguard_test["test"].filter(lambda x: x["subcategory"] == "benign")
-        # benign_category_dataset = concatenate_datasets([coconot_contrast["test"], benign_wildguard_dataset, truthful_qa_gen["validation"]])
-
         benign_category_dataset = coconot_contrast["test"]
 
         benign_category_dataloader = DataLoader(
             benign_category_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=os.cpu_count(),
+            pin_memory=True,
+            collate_fn=prompt_category_collate,
+        )
+
+        coconot_harmful_dataloaders[category] = harmful_category_dataloader
+        coconot_benign_dataloaders[category] = benign_category_dataloader
+
+    for category, dataloader in coconot_harmful_dataloaders.items():
+        print(f"{category} harmful category has {len(dataloader)} batches")
+
+    print("\n")
+
+    for category, dataloader in coconot_benign_dataloaders.items():
+        print(f"{category} benign category has {len(dataloader)} batches")
+
+    return coconot_harmful_dataloaders, coconot_benign_dataloaders
+
+
+def get_old_with_append_steering_vector_data(
+    batch_size: int = 4,
+    should_append: bool = True,
+) -> tuple[dict[str, DataLoader], dict[str, DataLoader]]:
+    # COCONot Dataset loading
+    coconot_orig = load_dataset("allenai/coconot", "original")  # 12.5k items
+    coconot_contrast = load_dataset("allenai/coconot", "contrast")  # 379 items
+
+    coconot_unique_categories = coconot_orig["train"].unique("category")
+
+    coconot_harmful_dataloaders = {}
+    coconot_benign_dataloaders = {}
+
+    def prompt_category_collate(batch: list[dict]) -> dict[str, list[str]]:
+        return {
+            "prompt": [sample["prompt"] for sample in batch],
+            "category": [sample.get("category") for sample in batch],
+        }
+
+    for category in coconot_unique_categories:
+        # Filter the orig train dataset
+        orig_category_train = coconot_orig["train"].filter(
+            lambda x, c=category: x["category"] == c
+        )
+
+        # Filter the orig test dataset
+        orig_category_test = coconot_orig["test"].filter(
+            lambda x, c=category: x["category"] == c
+        )
+
+        harmful_category_dataset = concatenate_datasets(
+            [orig_category_train, orig_category_test]
+        )
+
+        benign_category_dataset = coconot_contrast["test"]
+
+        harmful_categorical_prompts = []
+        benign_categorical_prompts = []
+
+        for item in harmful_category_dataset:
+            harmful_item = dict(item)
+
+            if should_append:
+                # harmful_item["prompt"] += (
+                #     "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n "
+                #     + f"[{category}]"
+                # )
+
+                harmful_item["prompt"] += f" [{category}]"
+
+            harmful_categorical_prompts.append(harmful_item)
+
+        for item in benign_category_dataset:
+            benign_item = dict(item)
+
+            if should_append:
+                # benign_item["prompt"] += (
+                #     "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n "
+                #     + f"[respond]"
+                # )
+
+                benign_item["prompt"] += f" [respond]"
+
+            benign_categorical_prompts.append(benign_item)
+
+        harmful_category_dataloader = DataLoader(
+            harmful_categorical_prompts,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=os.cpu_count(),
+            pin_memory=True,
+            collate_fn=prompt_category_collate,
+        )
+
+        benign_category_dataloader = DataLoader(
+            benign_categorical_prompts,
             batch_size=batch_size,
             shuffle=False,
             num_workers=os.cpu_count(),
@@ -257,7 +349,6 @@ def get_synthetic_steering_vector_data(
 def print_synthetic_pairs(
     hooked_model: HookedTransformer,
     tokenizer: AutoTokenizer,
-    SEED: int | None = 42,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> None:
     data_path = Path("/workspace/refusal_dataset.json")
@@ -301,7 +392,6 @@ def print_synthetic_pairs(
                 max_new_tokens=512,
                 do_sample=False,
                 temperature=1.0,
-                SEED=SEED,
                 device=device,
             )
 
@@ -333,7 +423,6 @@ def print_synthetic_pairs(
                 max_new_tokens=512,
                 do_sample=False,
                 temperature=1.0,
-                SEED=SEED,
                 device=device,
             )
 

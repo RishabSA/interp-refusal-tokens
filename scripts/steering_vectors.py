@@ -1,10 +1,12 @@
 import torch
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def compute_contrastive_steering_vectors(
-    benign_dict: dict[str, torch.Tensor],
-    harmful_dict: dict[str, torch.Tensor],
+    benign_activations: dict[str, torch.Tensor],
+    harmful_activations: dict[str, torch.Tensor],
     K: int | None = 100,
     tau: float | None = 1e-3,
 ) -> dict[str, torch.Tensor]:
@@ -26,8 +28,8 @@ def compute_contrastive_steering_vectors(
         (harmful_category, harmful),
         (benign_category, benign),
     ) in zip(
-        harmful_dict.items(),
-        benign_dict.items(),
+        harmful_activations.items(),
+        benign_activations.items(),
     ):
         if harmful_category != benign_category:
             print("Error: harmful and benign are not the same category")
@@ -57,132 +59,60 @@ def compute_contrastive_steering_vectors(
     return steering_vectors
 
 
-def compute_contrastive_steering_vectors_whitened(
-    benign_dict: dict[str, torch.Tensor],
-    harmful_dict: dict[str, torch.Tensor],
-    K: int | None = 100,
-    tau: float | None = 1e-3,
-    should_whiten: bool = True,
-    shrink_lam: float = 0.1,  # covariance shrinkage toward diagonal
-    remove_shared_directions: bool = True,
-    should_orthogonalize: bool = True,
+def whiten_steering_vectors(
+    steering_vectors: dict[str, torch.Tensor],
     eps: float = 1e-6,
 ) -> dict[str, torch.Tensor]:
-    # Enforce sparsity by only keeping the top-K values and setting the others to 0
-    def get_topk_sparse_vector(vector, K):
-        vals, idxs = torch.topk(vector.abs(), K)
-        mask = torch.zeros_like(vector)
-        mask[idxs] = 1.0
+    categories = list(steering_vectors.keys())
+    vectors = torch.stack(
+        [steering_vectors[category].to(torch.float32) for category in categories],
+        dim=0,
+    )  # (5, d_model)
 
-        return vector * mask
+    # Mean-center across categories (so each dimension has mean 0 across vectors)
+    vectors_centered = vectors - vectors.mean(dim=0, keepdim=True)  # (5, d)
 
-    # L2 Normalization
-    def l2_norm(vector, eps=1e-8):
-        return vector / (vector.norm(dim=-1, keepdim=True) + eps)
+    # Covariance over dimensions: Cov[i, j] = cov(v_i, v_j) across d_model components
+    # This gives an 5 x 5 matrix that captures how similar the vectors are.
+    covariance_matrix = (vectors_centered @ vectors_centered.T) / max(
+        vectors_centered.shape[1] - 1, 1
+    )  # (5, 5)
 
-    # Prepare pooled activations for whitening
-    # We estimate covariance on pooled (harmful - benign) samples per category
-    # (or at least on all benign+harmful activations if shapes mismatch).
-    pooled = []
-    for cat in harmful_dict.keys():
-        H = harmful_dict[cat]  # (N_h, d)
-        B = benign_dict[cat]  # (N_b, d)
+    # Add epsilon to the diagonal (identity matrix) for stability
+    covariance_matrix = covariance_matrix + eps * torch.eye(
+        vectors_centered.shape[0],
+        device=covariance_matrix.device,
+        dtype=covariance_matrix.dtype,
+    )
 
-        pooled.append(H - B)
+    # Eigendecompose the covariance matrix
+    # Cov = U diag(w) U^T
+    eigenvalues, eigenvectors = torch.linalg.eigh(covariance_matrix)
 
-    X = torch.cat(pooled, dim=0)  # (N_total, d)
-    X = X.to(torch.float32)
+    # Cov^{-1/2} = U diag(1/sqrt(w)) U^T
+    eigenvalues_clamped = eigenvalues.clamp_min(eps)
+    covariance_matrix_inv_sqrt = (
+        eigenvectors @ torch.diag(eigenvalues_clamped.rsqrt()) @ eigenvectors.T
+    )  # (5, 5)
 
-    # Compute mean and center
-    mu = X.mean(0, keepdim=True)  # (1, d)
-    Xc = X - mu
+    # Apply whitening transform in "vector space"
+    # Vw[i] is a linear combo of original vectors but now decorrelated
+    vectors_whitened = covariance_matrix_inv_sqrt @ vectors_centered  # (5, d)
 
-    # Covariance with simple shrinkage
-    if should_whiten:
-        # Empirical covariance
-        cov = (Xc.t() @ Xc) / max(Xc.shape[0] - 1, 1)  # (d, d)
+    # L2-normalization
+    vectors_whitened = vectors_whitened / (
+        vectors_whitened.norm(dim=1, keepdim=True) + eps
+    )
 
-        # Shrink towards the diagonal for stability
-        diag = torch.diag(torch.diag(cov))
-        cov = (1 - shrink_lam) * cov + shrink_lam * diag
-
-        # Jitter
-        cov = cov + eps * torch.eye(cov.shape[0], device=cov.device, dtype=cov.dtype)
-
-        # Inverse sqrt via eig
-        w, V = torch.linalg.eigh(cov)  # ascending
-        W_inv_sqrt = V @ torch.diag(w.clamp_min(1e-12).rsqrt()) @ V.t()
-
-        def whiten(vector):
-            return W_inv_sqrt @ vector
-
-    # Raw per-category vectors (mean difference)
-    raw_vectors = {}
-    for (cat_h, H), (cat_b, B) in zip(harmful_dict.items(), benign_dict.items()):
-        if cat_h != cat_b:
-            raise ValueError("Harmful and benign keys must align (same categories).")
-        # mean difference prototype (robust & simple)
-        v = H.mean(0) - B.mean(0)  # (d,)
-        raw_vectors[cat_h] = v
-
-    whitened_vectors = {}
-    for cat, vector in raw_vectors.items():
-        if should_whiten:
-            vector = whiten(vector - mu.squeeze(dim=0))
-        else:
-            vector = vector - mu.squeeze(dim=0)
-
-        if tau is not None:
-            # Filter out inactive features with values < tau
-            mask = (vector.abs() >= tau).float()
-            vector = vector * mask
-
-        if K is not None:
-            # Top-K sparsity filtering
-            vector = get_topk_sparse_vector(vector, K)
-
-        whitened_vectors[cat] = l2_norm(vector)
-
-    # Remove the shared refusal directions between steering vectors
-    decorelated_vectors = dict(whitened_vectors)
-    if remove_shared_directions:
-        # Get the L2 normalized average of all of the category-specific steering vectors
-        generic_vector = l2_norm(
-            torch.stack(list(whitened_vectors.values()), dim=0).mean(dim=0)
-        )
-
-        for cat, vector in whitened_vectors.items():
-            decorelated_vector = (
-                vector - (vector @ generic_vector) * generic_vector
-            )  # drop the shared directions
-            decorelated_vectors[cat] = l2_norm(decorelated_vector)
-
-    # Optional Gram–Schmidt orthogonalization
-    final_vectors = dict(decorelated_vectors)
-    if should_orthogonalize:
-        categories = list(decorelated_vectors.keys())
-        basis = []
-
-        for category in categories:
-            vector = decorelated_vectors[category].clone()
-
-            for b in basis:
-                vector = vector - (vector @ b) * b
-
-            vector = l2_norm(vector)
-            basis.append(vector)
-
-            final_vectors[category] = vector
-
-    return final_vectors
+    return {category: vectors_whitened[i] for i, category in enumerate(categories)}
 
 
 def compute_old_steering_vectors(
-    mean_benign_dict: dict[str, torch.Tensor],
-    mean_harmful_dict: dict[str, torch.Tensor],
-    should_filter_shared: bool = False,
+    mean_benign_activations: dict[str, torch.Tensor],
+    mean_harmful_activations: dict[str, torch.Tensor],
     K: int | None = None,
     tau: float | None = None,
+    should_filter_shared: bool = False,
 ) -> dict[str, torch.Tensor]:
     steering_vectors = {}
 
@@ -205,8 +135,8 @@ def compute_old_steering_vectors(
         (harmful_category, mean_harmful),
         (benign_category, mean_benign),
     ) in zip(
-        mean_harmful_dict.items(),
-        mean_benign_dict.items(),
+        mean_harmful_activations.items(),
+        mean_benign_activations.items(),
     ):
         if harmful_category != benign_category:
             print("Error: harmful and benign are not the same category")

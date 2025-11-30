@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from tqdm.notebook import tqdm
+from tqdm.auto import tqdm
 import torch
 import torch.nn as nn
 from torch import optim
@@ -10,7 +10,7 @@ from torch.utils.data import (
 )
 from sklearn.metrics import roc_curve, auc
 
-from scripts.linear_probe import LinearMLPProbe, LowRankProbe
+from scripts.linear_probe import LowRankProbe
 
 
 def compute_mean_and_pca_basis(
@@ -61,11 +61,10 @@ def train_steering_linear_probe(
     train_probe_dataloader: DataLoader,
     val_probe_dataloader: DataLoader,
     test_probe_dataloader: DataLoader,
-    d_model: int = 4096,
     lr: float = 1e-3,
     weight_decay: float = 1e-4,
     epochs: int = 15,
-    layer: int = 16,
+    layer: int = 18,
     use_calibrated_threshold: bool = True,
     checkpoint_path: str = "steering_probe_18_epoch_15.pt",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -155,6 +154,7 @@ def train_steering_linear_probe(
         roc_auc = auc(fpr, tpr)
 
         plt.figure()
+
         # Color points by threshold value
         sc = plt.scatter(fpr, tpr, c=thr, s=18)
         plt.plot(fpr, tpr, linewidth=1)
@@ -330,7 +330,7 @@ def train_steering_low_rank_probe(
     lr: float = 1e-3,
     weight_decay: float = 1e-5,
     epochs: int = 15,
-    layer: int = 16,
+    layer: int = 18,
     checkpoint_path: str = "steering_low_rank_probe_18_epoch_15.pt",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> tuple[nn.Module, float, float, float]:
