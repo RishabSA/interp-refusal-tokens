@@ -77,6 +77,13 @@ def generate_hooked_model_response(
     Returns:
         str: The hooked model's outputted response to the given prompt.
     """
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+        if hasattr(hooked_model, "config"):
+            hooked_model.config.pad_token_id = tokenizer.pad_token_id
+
+    tokenizer.padding_side = "left"
+
     stop_ids = [tokenizer.eos_token_id]
     stop_ids.extend([tokenizer.convert_tokens_to_ids(token) for token in stop_tokens])
 

@@ -112,8 +112,8 @@ def load_wildguard_test_data(batch_size: int = 4) -> dict[str, DataLoader]:
 
     def wildguard_collate(batch):
         return {
-            "prompt": [ex["prompt"] for ex in batch],
-            "category": [ex["category"] for ex in batch],
+            "prompt": [example["prompt"] for example in batch],
+            "category": [example["category"] for example in batch],
         }
 
     wildguard_test_dataloader = DataLoader(

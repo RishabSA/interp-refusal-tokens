@@ -25,14 +25,13 @@ def generate_with_steering(
     do_sample: bool = False,
     temperature: float = 1.0,
     append_seq: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+    stop_tokens: list[str] = ["<|eot_id|>"],
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> str:
     prompt += append_seq
 
-    stop_ids = [
-        tokenizer.eos_token_id,
-        tokenizer.convert_tokens_to_ids("<|eot_id|>"),
-    ]
+    stop_ids = [tokenizer.eos_token_id]
+    stop_ids.extend([tokenizer.convert_tokens_to_ids(token) for token in stop_tokens])
 
     hooked_model.reset_hooks()
 
@@ -166,7 +165,7 @@ def get_categorical_steering_vector_old(
     tokens = hooked_model.to_tokens(full_prompt)
 
     with torch.inference_mode(), amp.autocast(device.type, dtype=torch.float16):
-        sequences = hooked_model.generate(tokens, max_new_tokens=50, do_sample=False)
+        sequences = hooked_model.generate(tokens, max_new_tokens=16, do_sample=False)
 
     # [128256, 128257, 128258, 128259, 128260]
     refusal_token_ids = list(steering_vector_mapping.keys())

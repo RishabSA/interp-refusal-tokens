@@ -45,6 +45,13 @@ def generate_model_response(
     temperature: float = 1.0,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> str:
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+        if hasattr(model, "config"):
+            model.config.pad_token_id = tokenizer.pad_token_id
+
+    tokenizer.padding_side = "left"
+
     stop_ids = [tokenizer.eos_token_id]
     stop_ids.extend([tokenizer.convert_tokens_to_ids(token) for token in stop_tokens])
 

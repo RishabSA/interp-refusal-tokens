@@ -1,4 +1,6 @@
 import os
+import json
+import pandas as pd
 import random
 from collections import defaultdict
 import torch
@@ -80,6 +82,7 @@ def analyze_probe_direction_with_activations(
     activations_dict: dict[str, torch.Tensor],
     probe_model: nn.Module,
     K: int = 10,
+    outputs_save_path: str = "probe_direction_analysis.jsonl",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> None:
     assert isinstance(probe_model, LinearProbe), "probe_model must be a LinearProbe"
@@ -109,6 +112,23 @@ def analyze_probe_direction_with_activations(
     print("Bottom Activating Prompts (Most Benign)")
     for score, category, prompt in scored_examples[-K:]:
         print(f"Category: {category} | Score: {score:.4f} | Prompt: {prompt}")
+
+    prompt_activations = []
+    for rank, example in enumerate(scored_examples):
+        prompt_activations.append(
+            {
+                "rank": rank,
+                "score": example["score"],
+                "category": example["category"],
+                "prompt": example["prompt"],
+            }
+        )
+
+    pd.DataFrame(prompt_activations).to_json(
+        outputs_save_path, orient="records", lines=True, force_ascii=False
+    )
+
+    print(f"Saved {len(scored_examples)} scored examples to {outputs_save_path}")
 
 
 def compare_probe_direction_with_steering_vectors(
@@ -292,11 +312,21 @@ def get_categorical_steering_vector_probe(
 
         # print(f"Harmful: {top_refusal_token_id}, strength: {harmful_strength}")
         return steering_vector_mapping[top_refusal_token_id], harmful_strength
+
+        # if top_refusal_prob.item() > 0.5:
+        #     return None, 0.0
+        # else:
+        #     return steering_vector_mapping[top_refusal_token_id], harmful_strength
     else:
         # Benign
 
         # print(f"Benign: {top_refusal_token_id}, strength: {benign_strength}")
         return steering_vector_mapping[top_refusal_token_id], benign_strength
+
+        # if respond_prob.item() > 0.5:
+        #     return None, 0.0
+        # else:
+        #     return steering_vector_mapping[top_refusal_token_id], benign_strength
 
 
 def get_random_categorical_steering_vector_probe(
