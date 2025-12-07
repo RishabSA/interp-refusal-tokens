@@ -118,9 +118,9 @@ def analyze_probe_direction_with_activations(
         prompt_activations.append(
             {
                 "rank": rank,
-                "score": example["score"],
-                "category": example["category"],
-                "prompt": example["prompt"],
+                "score": example[0],
+                "category": example[1],
+                "prompt": example[2],
             }
         )
 

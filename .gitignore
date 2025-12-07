@@ -1,5 +1,7 @@
 papers/
 saved_outputs/layer_sweep
+saved_outputs/linear_probes
+
 
 *.pem
 
