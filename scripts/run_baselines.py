@@ -28,6 +28,7 @@ from huggingface_hub import login
 # Get tokens from environment variables
 HF_TOKEN = os.getenv("HF_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = "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"
 
 # Login to HuggingFace
 if HF_TOKEN:
@@ -42,6 +43,7 @@ from scripts.eval import (
     score_refusal_token,
     score_binary_refusal_token,
     score_llm_judge,
+    score_llm_judge_openrouter,
 )
 from scripts.eval_data import (
     split_dataloader_by_category,
@@ -91,6 +93,8 @@ def main():
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size")
     parser.add_argument("--eval_only", action="store_true", help="Only evaluate existing outputs, skip generation")
     parser.add_argument("--openai_api_key", type=str, default=None, help="OpenAI API key (or set OPENAI_API_KEY env var)")
+    parser.add_argument("--openrouter_api_key", type=str, default=None, help="OpenRouter API key for LLM judge with Llama 70B")
+    parser.add_argument("--llm_judge", action="store_true", help="Run LLM judge evaluation for all models (requires --openrouter_api_key)")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -111,6 +115,25 @@ def main():
             print(f"Failed to initialize OpenAI client: {e}")
     else:
         print("Warning: No OpenAI API key provided, LLM judge evaluation will be skipped")
+
+    # Setup OpenRouter client for LLM judge (Llama 70B)
+    openrouter_api_key = args.openrouter_api_key or OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY")
+    openrouter_client = None
+    score_llm_judge_llama = None
+
+    if openrouter_api_key:
+        try:
+            from openai import OpenAI
+            openrouter_client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=openrouter_api_key,
+            )
+            score_llm_judge_llama = partial(score_llm_judge_openrouter, openrouter_client)
+            print("OpenRouter client initialized for LLM judge (Llama 70B)")
+        except Exception as e:
+            print(f"Failed to initialize OpenRouter client: {e}")
+    elif args.llm_judge:
+        print("Warning: --llm_judge requires --openrouter_api_key")
 
     # Load benchmarks
     print("\n" + "="*60)
@@ -215,17 +238,28 @@ def main():
                         outputs_save_path=outputs_path,
                     )
 
-            # Evaluation with LLM as a Judge
+            # Evaluation with LLM as a Judge (GPT)
             # Only for llama models (categorical/binary-refusal have refusal token scoring)
             if "llama" in model_name:
                 if score_llm_judge_gpt and os.path.exists(outputs_path):
-                    print(f"Evaluating with LLM as a Judge...")
+                    print(f"Evaluating with LLM as a Judge (GPT)...")
                     eval_outputs_dataset(
                         score_batch=score_llm_judge_gpt,
                         batch_size=8,
-                        description=f"{benchmark_name} Test Evaluation with LLM as a Judge",
+                        description=f"{benchmark_name} Test Evaluation with LLM as a Judge (GPT)",
                         outputs_save_path=outputs_path,
                     )
+
+            # Evaluation with LLM as a Judge (Llama 70B via OpenRouter)
+            # For all models when --llm_judge flag is set
+            if args.llm_judge and score_llm_judge_llama and os.path.exists(outputs_path):
+                print(f"Evaluating with LLM as a Judge (Llama 70B)...")
+                eval_outputs_dataset(
+                    score_batch=score_llm_judge_llama,
+                    batch_size=4,
+                    description=f"{benchmark_name} Test Evaluation with LLM as a Judge (Llama 70B)",
+                    outputs_save_path=outputs_path,
+                )
 
         # Free memory after each model
         if not args.eval_only:

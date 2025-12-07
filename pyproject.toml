@@ -1,0 +1,25 @@
+[project]
+name = "interp-refusal-tokens"
+version = "0.1.0"
+description = "Interpretability research on refusal tokens"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "scikit-learn",
+    "torch",
+    "tqdm",
+    "plotly",
+    "transformers",
+    "transformer_lens",
+    "datasets",
+    "huggingface_hub",
+    "sentencepiece",
+    "lm_eval",
+    "openai",
+    "python-dotenv",
+]
+
+[tool.uv]
+dev-dependencies = []
