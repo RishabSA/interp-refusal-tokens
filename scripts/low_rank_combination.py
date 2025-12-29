@@ -46,7 +46,7 @@ def compute_steering_basis(
     covariance_sigma: torch.Tensor,
     eps: float = 1e-4,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    # covariance_sigma shape: (d_model d_model)
+    # covariance_sigma shape: (d_model, d_model)
 
     # W = U \Sigma^{-1/2} U^\top
 
