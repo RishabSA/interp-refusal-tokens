@@ -1,0 +1,8 @@
+@inproceedings{
+alagharu2025what,
+title={What Do Refusal Tokens Learn? Fine-Grained Representations and Evidence for Downstream Steering},
+author={Rishab Alagharu and Ishneet Sukhvinder Singh and Anjali Batta and Jaelyn S. Liang and Shaibi Shamsudeen and Arnav Sheth and Kevin Zhu and Ashwinee Panda and Zhen Wu},
+booktitle={Mechanistic Interpretability Workshop at NeurIPS 2025},
+year={2025},
+url={https://openreview.net/forum?id=szBGSWqwB7}
+}

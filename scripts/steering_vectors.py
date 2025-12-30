@@ -1,7 +1,5 @@
 import torch
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
-import numpy as np
 
 
 def compute_contrastive_steering_vectors(
@@ -59,55 +57,7 @@ def compute_contrastive_steering_vectors(
     return steering_vectors
 
 
-def whiten_steering_vectors(
-    steering_vectors: dict[str, torch.Tensor],
-    eps: float = 1e-6,
-) -> dict[str, torch.Tensor]:
-    categories = list(steering_vectors.keys())
-    vectors = torch.stack(
-        [steering_vectors[category].to(torch.float32) for category in categories],
-        dim=0,
-    )  # (5, d_model)
-
-    # Mean-center across categories (so each dimension has mean 0 across vectors)
-    vectors_centered = vectors - vectors.mean(dim=0, keepdim=True)  # (5, d)
-
-    # Covariance over dimensions: Cov[i, j] = cov(v_i, v_j) across d_model components
-    # This gives an 5 x 5 matrix that captures how similar the vectors are.
-    covariance_matrix = (vectors_centered @ vectors_centered.T) / max(
-        vectors_centered.shape[1] - 1, 1
-    )  # (5, 5)
-
-    # Add epsilon to the diagonal (identity matrix) for stability
-    covariance_matrix = covariance_matrix + eps * torch.eye(
-        vectors_centered.shape[0],
-        device=covariance_matrix.device,
-        dtype=covariance_matrix.dtype,
-    )
-
-    # Eigendecompose the covariance matrix
-    # Cov = U diag(w) U^T
-    eigenvalues, eigenvectors = torch.linalg.eigh(covariance_matrix)
-
-    # Cov^{-1/2} = U diag(1/sqrt(w)) U^T
-    eigenvalues_clamped = eigenvalues.clamp_min(eps)
-    covariance_matrix_inv_sqrt = (
-        eigenvectors @ torch.diag(eigenvalues_clamped.rsqrt()) @ eigenvectors.T
-    )  # (5, 5)
-
-    # Apply whitening transform in "vector space"
-    # Vw[i] is a linear combo of original vectors but now decorrelated
-    vectors_whitened = covariance_matrix_inv_sqrt @ vectors_centered  # (5, d)
-
-    # L2-normalization
-    vectors_whitened = vectors_whitened / (
-        vectors_whitened.norm(dim=1, keepdim=True) + eps
-    )
-
-    return {category: vectors_whitened[i] for i, category in enumerate(categories)}
-
-
-def compute_old_steering_vectors(
+def compute_steering_vectors(
     mean_benign_activations: dict[str, torch.Tensor],
     mean_harmful_activations: dict[str, torch.Tensor],
     K: int | None = None,

@@ -13,3 +13,5 @@ sentencepiece
 lm_eval
 openai
 python-dotenv
+azure-identity
+azure-ai-projects
