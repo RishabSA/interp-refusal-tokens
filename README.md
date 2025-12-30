@@ -17,3 +17,18 @@
 To run all evaluations, steering vector computations, model diffing, steered generations, and more, run from the [Jupyter notebook](refusal_tokens.ipynb), which imports scripts from the scripts folder.
 
 Please send any inquiries to 27ralagharu@woodward.edu
+
+## Citing this work
+
+If you find this work useful in your research, please consider citing our [paper](https://openreview.net/forum?id=szBGSWqwB7):
+
+```tex
+@inproceedings{
+alagharu2025what,
+title={What Do Refusal Tokens Learn? Fine-Grained Representations and Evidence for Downstream Steering},
+author={Rishab Alagharu and Ishneet Sukhvinder Singh and Anjali Batta and Jaelyn S. Liang and Shaibi Shamsudeen and Arnav Sheth and Kevin Zhu and Ashwinee Panda and Zhen Wu},
+booktitle={Mechanistic Interpretability Workshop at NeurIPS 2025},
+year={2025},
+url={https://openreview.net/forum?id=szBGSWqwB7}
+}
+```
