@@ -87,31 +87,55 @@ For the LLM as a judge, we use **`GPT-5-mini**`.
 
 #### Refusal Rate by LLM as a Judge
 
+**`367/1001 -> 36.6633%`**
+**`374/1001 -> 37.3626%`**
+**`361/1001 -> 36.0639%`**
+
+**`36.6966% ± 0.5307%`**
+
 | Category                      | Ratio 1 | Refusal Rate 1 | Ratio 2 | Refusal Rate 2 | Ratio 3 | Refusal Rate 3 |
 | ----------------------------- | ------- | -------------- | ------- | -------------- | ------- | -------------- |
-| Requests with safety concerns |         |                |         |                |         |                |
-| Unsupported requests          |         |                |         |                |         |                |
-| Indeterminate requests        |         |                |         |                |         |                |
-| Incomplete requests           |         |                |         |                |         |                |
-| Humanizing requests           |         |                |         |                |         |                |
+| Requests with safety concerns | 262/395 | 66.3291%       | 268/395 | 67.8481%       | 265/395 | 67.0886%       |
+| Unsupported requests          | 50/157  | 31.8471%       | 60/157  | 38.2166%       | 58/157  | 36.9427%       |
+| Indeterminate requests        | 37/142  | 26.0563%       | 34/142  | 23.9437%       | 30/142  | 21.1268%       |
+| Incomplete requests           | 6/225   | 2.6667%        | 8/225   | 3.5556%        | 6/225   | 2.6667%        |
+| Humanizing requests           | 12/82   | 14.6341%       | 4/82    | 4.8780%        | 2/82    | 2.4390%        |
 
 ### COCONot Contrast
+
+**`11/379 -> 2.9024%`**
+**`11/379 -> 2.9024%`**
+**`11/379 -> 2.9024%`**
+
+**`2.9024% ± 0.0000%`**
 
 #### Refusal Rate by LLM as a Judge
 
 | Category                      | Ratio 1 | Refusal Rate 1 | Ratio 2 | Refusal Rate 2 | Ratio 3 | Refusal Rate 3 |
 | ----------------------------- | ------- | -------------- | ------- | -------------- | ------- | -------------- |
-| Requests with safety concerns |         |                |         |                |         |                |
-| Unsupported requests          |         |                |         |                |         |                |
-| Incomplete requests           |         |                |         |                |         |                |
+| Requests with safety concerns | 10/149  | 6.7114%        | 10/149  | 6.7114%        | 10/149  | 6.7114%        |
+| Unsupported requests          | 0/82    | 0.0000%        | 0/82    | 0.0000%        | 0/82    | 0.0000%        |
+| Incomplete requests           | 1/148   | 0.6757%        | 1/148   | 0.6757%        | 1/148   | 0.6757%        |
 
 ### WildGuard Unharmful
 
 #### Refusal Rate by LLM as a Judge
 
+**`105/945 -> 11.1111%`**
+**`106/945 -> 11.2169%`**
+**`105/945 -> 11.1111%`**
+
+**`11.1464% ± 0.0499%`**
+
 ### WildGuard Harmful
 
 #### Refusal Rate by LLM as a Judge
+
+**`597/754 -> 79.1777%`**
+**`590/754 -> 78.2493%`**
+**`599/754 -> 79.4430%`**
+
+**`78.9567% ± 0.5118%`**
 
 ### WildJailbreak Adversarial Benign
 
@@ -247,19 +271,19 @@ For the LLM as a judge, we use **`GPT-5-mini**`.
 
 #### Refusal Rate by LLM as a Judge
 
-**`902/1001 -> 90.1099%`**
-**`879/1001 -> 87.8122%`**
-**`878/1001 -> 87.7123%`**
+**`880/1001 -> 87.9121%`**
+**`869/1001 -> 86.8132%`**
+**`866/1001 -> 86.5135%`**
 
-**`88.5448% ± 1.1074%`**
+**`87.0796% ± 0.6012%`**
 
 | Category                      | Ratio 1 | Refusal Rate 1 | Ratio 2 | Refusal Rate 2 | Ratio 3 | Refusal Rate 3 |
 | ----------------------------- | ------- | -------------- | ------- | -------------- | ------- | -------------- |
-| Requests with safety concerns | 386/395 | 97.7215%       | 388/395 | 98.2278%       | 382/395 | 96.7089%       |
-| Unsupported requests          | 150/157 | 95.5414%       | 150/157 | 95.5414%       | 150/157 | 95.5414%       |
-| Indeterminate requests        | 119/142 | 83.8028%       | 124/142 | 87.3239%       | 119/142 | 83.8028%       |
-| Incomplete requests           | 176/225 | 78.2222%       | 165/225 | 73.3333%       | 163/225 | 72.4444%       |
-| Humanizing requests           | 71/82   | 86.5854%       | 52/82   | 63.4146%       | 64/82   | 78.0488%       |
+| Requests with safety concerns | 381/395 | 96.4557%       | 386/395 | 97.7215%       | 378/395 | 95.6962%       |
+| Unsupported requests          | 138/157 | 87.8981%       | 149/157 | 94.9045%       | 148/157 | 94.2675%       |
+| Indeterminate requests        | 120/142 | 84.5070%       | 120/142 | 84.5070%       | 119/142 | 83.8028%       |
+| Incomplete requests           | 168/225 | 74.6667%       | 150/225 | 66.6667%       | 160/225 | 71.1111%       |
+| Humanizing requests           | 73/82   | 89.0244%       | 64/82   | 78.0488%       | 61/82   | 74.3902%       |
 
 ### COCONot Contrast
 
@@ -623,13 +647,19 @@ For the LLM as a judge, we use **`GPT-5-mini**`.
 
 #### Refusal Rate by LLM as a Judge
 
+**`762/1001 -> 76.1239%`**
+**`799/1001 -> 79.8202%`**
+**`772/1001 -> 77.1229%`**
+
+**`77.6890% ± 1.5612%`**
+
 | Category                      | Ratio 1 | Refusal Rate 1 | Ratio 2 | Refusal Rate 2 | Ratio 3 | Refusal Rate 3 |
 | ----------------------------- | ------- | -------------- | ------- | -------------- | ------- | -------------- |
-| Requests with safety concerns |         |                |         |                |         |                |
-| Unsupported requests          |         |                |         |                |         |                |
-| Indeterminate requests        |         |                |         |                |         |                |
-| Incomplete requests           |         |                |         |                |         |                |
-| Humanizing requests           |         |                |         |                |         |                |
+| Requests with safety concerns | 376/395 | 95.1899%       | 365/395 | 92.4051%       | 377/395 | 95.4430%       |
+| Unsupported requests          | 146/157 | 92.9936%       | 144/157 | 91.7197%       | 130/157 | 82.8025%       |
+| Indeterminate requests        | 93/142  | 65.4930%       | 90/142  | 63.3803%       | 97/142  | 68.3099%       |
+| Incomplete requests           | 125/225 | 55.5556%       | 129/225 | 57.3333%       | 124/225 | 55.1111%       |
+| Humanizing requests           | 22/82   | 26.8293%       | 71/82   | 86.5854%       | 44/82   | 53.6585%       |
 
 ### COCONot Contrast
 
@@ -645,11 +675,17 @@ For the LLM as a judge, we use **`GPT-5-mini**`.
 
 #### Refusal Rate by LLM as a Judge
 
+**`9/379 -> 2.3747%`**
+**`6/379 -> 1.5831%`**
+**`9/379 -> 2.3747%`**
+
+**`2.1108% ± 0.3731%`**
+
 | Category                      | Ratio 1 | Refusal Rate 1 | Ratio 2 | Refusal Rate 2 | Ratio 3 | Refusal Rate 3 |
 | ----------------------------- | ------- | -------------- | ------- | -------------- | ------- | -------------- |
-| Requests with safety concerns |         |                |         |                |         |                |
-| Unsupported requests          |         |                |         |                |         |                |
-| Incomplete requests           |         |                |         |                |         |                |
+| Requests with safety concerns | 4/149   | 2.6846%        | 1/149   | 0.6711%        | 4/149   | 2.6846%        |
+| Unsupported requests          | 0/82    | 0.0000%        | 0/82    | 0.0000%        | 0/82    | 0.0000%        |
+| Incomplete requests           | 5/148   | 3.3784%        | 5/148   | 3.3784%        | 5/148   | 3.3784%        |
 
 ### WildGuard Unharmful
 
@@ -659,6 +695,12 @@ For the LLM as a judge, we use **`GPT-5-mini**`.
 
 #### Refusal Rate by LLM as a Judge
 
+**`38/945 -> 4.0212%`**
+**`42/945 -> 4.4444%`**
+**`42/945 -> 4.4444%`**
+
+**`4.3034% ± 0.1995%`**
+
 ### WildGuard Harmful
 
 #### Refusal Rate by Refusal Token
@@ -667,6 +709,12 @@ For the LLM as a judge, we use **`GPT-5-mini**`.
 
 #### Refusal Rate by LLM as a Judge
 
+**`479/754 -> 63.5279%`**
+**`481/754 -> 63.7931%`**
+**`476/754 -> 63.1300%`**
+
+**`63.4836% ± 0.2725%`**
+
 ### WildJailbreak Adversarial Benign
 
 #### Refusal Rate by Refusal Token
@@ -674,6 +722,12 @@ For the LLM as a judge, we use **`GPT-5-mini**`.
 **`0/210 -> 0.0000%`**
 
 #### Refusal Rate by LLM as a Judge
+
+**`5/210 -> 2.3810%`**
+**`8/210 -> 3.8095%`**
+**`5/210 -> 2.3810%`**
+
+**`2.8571% ± 0.6734%`**
 
 ### WildJailbreak Adversarial Harmful
 
@@ -704,18 +758,24 @@ For the LLM as a judge, we use **`GPT-5-mini**`.
 
 #### Refusal Rate by LLM as a Judge
 
+**`328/1319 -> 24.8673%`**
+**`327/1319 -> 24.7915%`**
+**`339/1319 -> 25.7013%`**
+
+**`25.1200% ± 0.4122%`**
+
 | Category   | Ratio 1 | Refusal Rate 1 | Ratio 2 | Refusal Rate 2 | Ratio 3 | Refusal Rate 3 |
 | ---------- | ------- | -------------- | ------- | -------------- | ------- | -------------- |
-| illegal    |         |                |         |                |         |                |
-| unethical  |         |                |         |                |         |                |
-| self-harm  |         |                |         |                |         |                |
-| privacy    |         |                |         |                |         |                |
-| harassment |         |                |         |                |         |                |
-| violence   |         |                |         |                |         |                |
-| deception  |         |                |         |                |         |                |
-| harmful    |         |                |         |                |         |                |
-| hate       |         |                |         |                |         |                |
-| sexual     |         |                |         |                |         |                |
+| illegal    | 126/527 | 23.9089%       | 121/527 | 22.9602%       | 129/527 | 24.4782%       |
+| unethical  | 35/125  | 28.0000%       | 35/125  | 28.0000%       | 34/125  | 27.2000%       |
+| self-harm  | 13/63   | 20.6349%       | 12/63   | 19.0476%       | 14/63   | 22.2222%       |
+| privacy    | 53/199  | 26.6332%       | 54/199  | 27.1357%       | 62/199  | 31.1558%       |
+| harassment | 12/41   | 29.2683%       | 12/41   | 29.2683%       | 11/41   | 26.8293%       |
+| violence   | 19/66   | 28.7879%       | 18/66   | 27.2727%       | 20/66   | 30.3030%       |
+| deception  | 16/72   | 22.2222%       | 17/72   | 23.6111%       | 14/72   | 19.4444%       |
+| harmful    | 17/106  | 16.0377%       | 17/106  | 16.0377%       | 17/106  | 16.0377%       |
+| hate       | 24/54   | 44.4444%       | 24/54   | 44.4444%       | 22/54   | 40.7407%       |
+| sexual     | 13/66   | 19.6970%       | 17/66   | 25.7576%       | 16/66   | 24.2424%       |
 
 ### OR-Bench Toxic
 
@@ -738,15 +798,21 @@ For the LLM as a judge, we use **`GPT-5-mini**`.
 
 #### Refusal Rate by LLM as a Judge
 
+**`573/655 -> 87.4809%`**
+**`578/655 -> 88.2443%`**
+**`541/655 -> 82.5954%`**
+
+**`86.1069% ± 2.5025%`**
+
 | Category   | Ratio 1 | Refusal Rate 1 | Ratio 2 | Refusal Rate 2 | Ratio 3 | Refusal Rate 3 |
 | ---------- | ------- | -------------- | ------- | -------------- | ------- | -------------- |
-| illegal    |         |                |         |                |         |                |
-| unethical  |         |                |         |                |         |                |
-| self-harm  |         |                |         |                |         |                |
-| privacy    |         |                |         |                |         |                |
-| harassment |         |                |         |                |         |                |
-| violence   |         |                |         |                |         |                |
-| deception  |         |                |         |                |         |                |
-| harmful    |         |                |         |                |         |                |
-| hate       |         |                |         |                |         |                |
-| sexual     |         |                |         |                |         |                |
+| illegal    | 45/50   | 90.0000%       | 43/50   | 86.0000%       | 45/50   | 90.0000%       |
+| unethical  | 46/61   | 75.4098%       | 46/61   | 75.4098%       | 9/61    | 14.7541%       |
+| self-harm  | 91/92   | 98.9130%       | 89/92   | 96.7391%       | 91/92   | 98.9130%       |
+| privacy    | 53/61   | 86.8852%       | 52/61   | 85.2459%       | 52/61   | 85.2459%       |
+| harassment | 62/76   | 81.5789%       | 62/76   | 81.5789%       | 60/76   | 78.9474%       |
+| violence   | 67/71   | 94.3662%       | 65/71   | 91.5493%       | 66/71   | 92.9577%       |
+| deception  | 62/83   | 74.6988%       | 73/83   | 87.9518%       | 74/83   | 89.1566%       |
+| harmful    | 23/30   | 76.6667%       | 24/30   | 80.0000%       | 20/30   | 66.6667%       |
+| hate       | 58/58   | 100.0000%      | 58/58   | 100.0000%      | 58/58   | 100.0000%      |
+| sexual     | 66/73   | 90.4110%       | 66/73   | 90.4110%       | 66/73   | 90.4110%       |

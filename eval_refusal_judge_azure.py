@@ -150,7 +150,7 @@ if __name__ == "__main__":
             score_batch=score_llm_judge_azure_hook,
             batch_size=32,
             description="Evaluation with LLM as a Judge",
-            outputs_load_path="saved_outputs/model_outputs/categorical-refusal-steered/coconot_orig_test_outputs_categorical-refusal_categorically_steered.jsonl",
+            outputs_load_path="saved_outputs/model_outputs/llama-instruct-baseline/wildguard_harmful_test_outputs_llama-instruct.jsonl",
         )
         refusal_rates.append(total_refusals / total)
 
