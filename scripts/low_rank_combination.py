@@ -55,6 +55,7 @@ def compute_steering_basis(
         + eps * torch.eye(covariance_sigma.shape[0], device=covariance_sigma.device)
     )
 
+    # Used to remove activation-space aniostropyso that all steering directions are equal
     whitening_matrix = torch.matmul(
         (U * (S.clamp_min(eps).rsqrt())), U.T
     )  # shape: (d_model, d_model)
@@ -72,8 +73,8 @@ def compute_steering_basis(
     # Orthonormalize with QR Decomposition (whitening_matrix = QR)
     Q, R = torch.linalg.qr(
         whitened_vectors, mode="reduced"
-    )  # Q shape: (d_model, 5}, R shape: (5, 5)
+    )  # Q shape: (d_model, 5), R shape: (5, 5)
 
-    # Q is the orthonormal steering basis
+    # Q is the orthonormal steering basis where each category direction is uncorrelated
 
     return Q, R, whitening_matrix

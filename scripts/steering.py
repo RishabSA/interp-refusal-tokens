@@ -1,11 +1,12 @@
 from typing import Callable
 import torch
+import torch.nn as nn
 from torch import amp
 from functools import partial
 from transformer_lens.utils import get_act_name
-from scripts.eval_data import Counter
 from transformers import PreTrainedTokenizerBase
 from transformer_lens import HookedTransformer
+from transformer_lens.hook_points import HookPoint
 
 
 def generate_with_steering(
@@ -13,7 +14,7 @@ def generate_with_steering(
     hooked_model: HookedTransformer,
     tokenizer: PreTrainedTokenizerBase,
     steering_vector: torch.Tensor,
-    intervention_hook: Callable,
+    steering_hook: Callable,
     get_steering_vector: Callable = None,
     fixed_strength: float | None = None,
     benign_strength: float | None = -4.0,
@@ -57,7 +58,6 @@ def generate_with_steering(
                 "You must pass in values for either fixed_strength or benign_strength and harmful_strength"
             )
 
-    # Build the forward hooks
     fwd_hooks = []
 
     if steering_vector is not None:
@@ -67,12 +67,11 @@ def generate_with_steering(
 
         hook_name = get_act_name(activation_name, layer)
 
-        token_limit_gen_counter = Counter()
         hook_fn = partial(
-            intervention_hook,
+            steering_hook,
             steering_vector,
+            None,
             strength,
-            token_limit_gen_counter,
             device,
         )
         fwd_hooks.append((hook_name, hook_fn))
@@ -109,8 +108,13 @@ def generate_with_steering(
     return steered
 
 
-def steering_hook_activations(
-    steering_vector: torch.Tensor, strength, counter, device, activation, hook
+def steering_hook(
+    steering_vector: torch.Tensor | None,
+    low_rank_steering_map: nn.Module | None,
+    strength: float,
+    device: torch.device,
+    activation: torch.Tensor,
+    hook: HookPoint,
 ) -> torch.Tensor:
     # A positive value of strength increases the category-specific refusal behavior
     # A negative value of strength decreases the category-specific refusal behavior
@@ -118,32 +122,38 @@ def steering_hook_activations(
     # activation shape: (batch_size, seq_len, d_model)
     # Steers the activation with the steering vector and steering strength
 
-    if True:
-        # if counter.count < 2:
-        batch_size, seq_len, d_model = activation.shape
-        out = activation.clone()
+    batch_size, seq_len, d_model = activation.shape
+    out = activation.clone()
+    token_activation = out[:, -1, :]  # shape: (batch_size, d_model)
 
+    if steering_vector:
         vector = steering_vector.to(device)
+    elif low_rank_steering_map:
+        vector = low_rank_steering_map(token_activation).to(device)
 
-        if vector.ndim == 1:
-            # Expand the steering vector to 2D to apply for the batch
-            vector = vector.unsqueeze(dim=0).expand(batch_size, d_model)
-        elif vector.ndim == 2:
-            assert vector.shape == (
-                batch_size,
-                d_model,
-            ), f"steering_vector must be (d_model,) or (batch_size, d_model), got {vector.shape}"
-        else:
-            raise ValueError("steering_vector must be 1D or 2D")
+        # steering_vector = low_rank_steering_shift.delta().to(
+        #     device, activation.dtype
+        # )  # shape: (d_model)
+    else:
+        raise ValueError(
+            "either steering_vector or low_rank_steering_map must be provided in order to apply steering"
+        )
 
-        # Add steering at the last token position
-        out[:, -1, :] = out[:, -1, :] + strength * vector
+    if vector.ndim == 1:
+        # Expand the steering vector to 2D to apply for the batch
+        vector = vector.unsqueeze(dim=0).expand(batch_size, d_model)
+    elif vector.ndim == 2:
+        assert vector.shape == (
+            batch_size,
+            d_model,
+        ), f"steering_vector must be (d_model,) or (batch_size, d_model), got {vector.shape}"
+    else:
+        raise ValueError("steering_vector must be 1D or 2D")
 
-        counter.count += 1
-        return out
+    # Add steering at the last token position
+    out[:, -1, :] = token_activation + strength * vector
 
-    counter.count += 1
-    return activation
+    return out
 
 
 def get_categorical_steering_vector_old(

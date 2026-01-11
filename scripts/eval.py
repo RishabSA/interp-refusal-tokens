@@ -16,7 +16,7 @@ from openai import OpenAI, AzureOpenAI
 
 from scripts.activation_caching import cache_hooked_activations_before_pad
 from scripts.steering import (
-    steering_hook_activations,
+    steering_hook,
     get_categorical_steering_vector_old,
 )
 from scripts.steering_vectors import (
@@ -132,7 +132,7 @@ def generate_outputs_dataset(
     benign_strength: float | None = -4.0,
     harmful_strength: float | None = 1.0,
     get_steering_vector: Callable | None = None,
-    intervention_hook: Callable | None = None,
+    steering_hook: Callable | None = None,
     layer: int | None = None,
     activation_name: str | None = None,
     description: str = "Evaluation",
@@ -156,7 +156,7 @@ def generate_outputs_dataset(
         benign_strength (float | None, optional). Defaults to -4.0.
         harmful_strength (float | None, optional). Defaults to 1.0.
         get_steering_vector (Callable | None, optional). Defaults to None.
-        intervention_hook (Callable | None, optional). Defaults to None.
+        steering_hook (Callable | None, optional). Defaults to None.
         layer (int | None, optional). Defaults to None.
         activation_name (str | None, optional). Defaults to None.
         description (str, optional). Defaults to "Evaluation".
@@ -184,10 +184,10 @@ def generate_outputs_dataset(
     is_hooked = isinstance(model, HookedTransformer)
 
     fwd_hooks = None
-    if intervention_hook is not None:
+    if steering_hook is not None:
         assert (
             activation_name is not None and layer is not None
-        ), "When using intervention_hook, pass layer and activation_name."
+        ), "When using steering_hook, pass layer and activation_name."
 
     stop_ids = [tokenizer.eos_token_id]
     stop_ids.extend([tokenizer.convert_tokens_to_ids(token) for token in stop_tokens])
@@ -200,7 +200,7 @@ def generate_outputs_dataset(
                 prompts, categories = batch["prompt"], batch["category"]
                 prompts = [prompt + append_seq for prompt in prompts]
 
-                if intervention_hook is not None:
+                if steering_hook is not None:
                     tokens = model.to_tokens(prompts).to(device)
 
                     steer_batch = steering_vector
@@ -261,12 +261,11 @@ def generate_outputs_dataset(
                     if activation_name is not None:
                         hook_name = get_act_name(activation_name, layer)
 
-                        token_limit_gen_counter = Counter()
                         hook_fn = partial(
-                            intervention_hook,
+                            steering_hook,
                             steer_batch,
+                            None,
                             strength,
-                            token_limit_gen_counter,
                             device,
                         )
                         fwd_hooks.append((hook_name, hook_fn))
@@ -816,7 +815,7 @@ def steering_evaluation_layer_sweep(
             fixed_strength=None,
             benign_strength=-4.0,
             harmful_strength=1.0,
-            intervention_hook=steering_hook_activations,
+            steering_hook=steering_hook,
             layer=layer,
             activation_name="resid_post",
             max_new_tokens=512,
@@ -833,7 +832,7 @@ def steering_evaluation_layer_sweep(
             fixed_strength=None,
             benign_strength=-4.0,
             harmful_strength=1.0,
-            intervention_hook=steering_hook_activations,
+            steering_hook=steering_hook,
             layer=layer,
             activation_name="resid_post",
             max_new_tokens=512,

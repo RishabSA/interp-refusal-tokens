@@ -1,6 +1,7 @@
 from tqdm.auto import tqdm
 import torch
 from transformer_lens import HookedTransformer
+from transformer_lens.hook_points import HookPoint
 from transformer_lens.utils import get_act_name
 from torch.utils.data import DataLoader
 
@@ -35,7 +36,7 @@ def cache_hooked_activations_before_pad(
     # Last non-pad position for the current batch
     current_positions = None
 
-    def activation_hook(activation, hook):
+    def activation_hook(activation: torch.Tensor, hook: HookPoint):
         # activation shape: (batch_size, seq_len, d_model)
         # current_positions shape: (batch_size) indices of the last non-pad token
         nonlocal current_positions

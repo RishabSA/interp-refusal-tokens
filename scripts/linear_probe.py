@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from transformer_lens.utils import get_act_name
 from transformer_lens import HookedTransformer
+from transformer_lens.hook_points import HookPoint
 from datasets import load_dataset, concatenate_datasets
 
 
@@ -252,7 +253,7 @@ def get_categorical_steering_vector_probe(
 
     hook_name = get_act_name(activation_name, layer)
 
-    def activation_hook(activation, hook):
+    def activation_hook(activation: torch.Tensor, hook: HookPoint):
         nonlocal token_activation
         token_activation = activation[:, -1, :].detach()
 
@@ -345,7 +346,7 @@ def get_random_categorical_steering_vector_probe(
 
     hook_name = get_act_name(activation_name, layer)
 
-    def activation_hook(activation, hook):
+    def activation_hook(activation: torch.Tensor, hook: HookPoint):
         nonlocal token_activation
         token_activation = activation[:, -1, :].detach()
 

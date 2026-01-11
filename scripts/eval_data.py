@@ -6,13 +6,6 @@ from torch.utils.data import (
 from datasets import load_dataset
 
 
-class Counter:
-    """Helper class for counting refusals or anything else when evaluating on a dataset"""
-
-    def __init__(self, start: int = 0):
-        self.count = start
-
-
 def split_dataloader_by_category(
     iterator: DataLoader, category_field: str = "category"
 ) -> dict[str, DataLoader]:

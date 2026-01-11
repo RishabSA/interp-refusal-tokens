@@ -2,6 +2,7 @@ import torch
 from torch import amp
 from transformer_lens.utils import get_act_name
 from transformer_lens import HookedTransformer
+from transformer_lens.hook_points import HookPoint
 from transformers import PreTrainedTokenizerBase
 
 
@@ -37,7 +38,7 @@ def generate_with_activation_patching(
     # Build the patching hook
     hook_name = get_act_name(activation_name, layer)
 
-    def patch_hook(activation, hook):
+    def patch_hook(activation: torch.Tensor, hook: HookPoint):
         patched = activation.clone()
         residual = cache_clean[hook_name]
 
@@ -100,7 +101,7 @@ def generate_with_attribution_patching(
     saved = {}
 
     # Build the forward-pass hook
-    def save_activation(activation, hook):
+    def save_activation(activation: torch.Tensor, hook: HookPoint):
         # activation shape: (batch_size, seq_len, d_model)
         saved["activation"] = activation.clone().detach().requires_grad_(True)
 
