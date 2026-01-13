@@ -13,7 +13,7 @@ from scripts.steering import steering_hook
 
 def train_low_rank_combination_steering_map(
     hooked_model: HookedTransformer,
-    low_rank_steering_map: LowRankSteeringMap,
+    low_rank_map: LowRankSteeringMap,
     harmful_training_prompts_dataloader: DataLoader,
     benign_training_prompts_dataloader: DataLoader,
     harmful_testing_prompts_dataloader: DataLoader,
@@ -26,7 +26,7 @@ def train_low_rank_combination_steering_map(
     epochs: int = 5,
     lr: float = 1e-3,
     eps: float = 1e-12,
-    checkpoint_path: str = "low_rank_steering_map_epoch_5.pt",
+    checkpoint_path: str = "low_rank_map_epoch_5.pt",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> LowRankSteeringMap:
     def kl_divergence(
@@ -46,7 +46,7 @@ def train_low_rank_combination_steering_map(
 
     hook_name = get_act_name(activation_name, layer)
 
-    optimizer = torch.optim.AdamW(params=low_rank_steering_map.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(params=low_rank_map.parameters(), lr=lr)
     start_epoch = 0
 
     if os.path.exists(checkpoint_path):
@@ -55,11 +55,11 @@ def train_low_rank_combination_steering_map(
             checkpoint_path, map_location=device, weights_only=False
         )
 
-        low_rank_steering_map.load_state_dict(checkpoint["model_state_dict"])
+        low_rank_map.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         start_epoch = checkpoint["epoch"]
 
-    low_rank_steering_map.to(device).train()
+    low_rank_map.to(device).train()
 
     for epoch in tqdm(range(start_epoch, epochs), desc=f"Training for {epochs} epochs"):
         total_training_harmful_loss = 0.0
@@ -104,7 +104,7 @@ def train_low_rank_combination_steering_map(
             hook_fn = partial(
                 steering_hook,
                 None,
-                low_rank_steering_map,
+                low_rank_map,
                 strength,
                 device,
             )
@@ -176,7 +176,7 @@ def train_low_rank_combination_steering_map(
             hook_fn = partial(
                 steering_hook,
                 None,
-                low_rank_steering_map,
+                low_rank_map,
                 strength,
                 device,
             )
@@ -231,13 +231,13 @@ def train_low_rank_combination_steering_map(
 
         checkpoint = {
             "epoch": epoch + 1,
-            "model_state_dict": low_rank_steering_map.state_dict(),
+            "model_state_dict": low_rank_map.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
         }
 
         torch.save(
             checkpoint,
-            f"low_rank_steering_map_epoch_{epoch + 1}.pt",
+            f"low_rank_map_epoch_{epoch + 1}.pt",
         )
 
-    return low_rank_steering_map
+    return low_rank_map

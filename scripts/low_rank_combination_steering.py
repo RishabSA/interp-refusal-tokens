@@ -23,4 +23,5 @@ class LowRankSteeringMap(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x shape: (batch_size, d_model)
+        x = x.to(dtype=self.U.dtype)
         return (x @ self.V) @ self.U.T  # shape: (batch_size, d_model)

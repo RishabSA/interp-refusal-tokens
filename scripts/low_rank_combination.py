@@ -31,7 +31,12 @@ def get_low_rank_combination_data(
     return coconot_benign_dataloader
 
 
-def compute_covariance_sigma(activations: torch.Tensor) -> torch.Tensor:
+def compute_covariance_sigma(
+    activations: torch.Tensor,
+    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+) -> torch.Tensor:
+    activations = activations.to(device, dtype=torch.float32)
+
     activations_centered = activations - activations.mean(dim=0, keepdim=True)
 
     covariance_sigma = (
@@ -45,6 +50,7 @@ def compute_steering_basis(
     steering_vectors: dict[str, torch.Tensor],
     covariance_sigma: torch.Tensor,
     eps: float = 1e-4,
+    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     # covariance_sigma shape: (d_model, d_model)
 
@@ -64,6 +70,8 @@ def compute_steering_basis(
     categories = list(steering_vectors.keys())
     steering_vector_stacked = torch.stack(
         [steering_vectors[category] for category in categories], dim=1
+    ).to(
+        device, dtype=torch.float32
     )  # shape: (d_model, 5)
 
     whitened_vectors = torch.matmul(

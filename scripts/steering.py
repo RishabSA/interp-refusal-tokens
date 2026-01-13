@@ -129,7 +129,7 @@ def generate_with_steering(
 
 def steering_hook(
     steering_vector: torch.Tensor | None,
-    low_rank_steering_map: nn.Module | None,
+    low_rank_map: nn.Module | None,
     strength: float,
     device: torch.device,
     activation: torch.Tensor,
@@ -147,15 +147,17 @@ def steering_hook(
 
     if steering_vector:
         vector = steering_vector.to(device)
-    elif low_rank_steering_map:
-        vector = low_rank_steering_map(token_activation).to(device)
+    elif low_rank_map:
+        vector = low_rank_map(token_activation).to(
+            device=activation.device, dtype=activation.dtype
+        )
 
         # steering_vector = low_rank_steering_shift.delta().to(
         #     device, activation.dtype
         # )  # shape: (d_model)
     else:
         raise ValueError(
-            "either steering_vector or low_rank_steering_map must be provided in order to apply steering"
+            "either steering_vector or low_rank_map must be provided in order to apply steering"
         )
 
     if vector.ndim == 1:
