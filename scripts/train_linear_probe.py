@@ -10,8 +10,6 @@ from torch.utils.data import (
 )
 from sklearn.metrics import roc_curve, auc
 
-from scripts.linear_probe import LowRankProbe
-
 
 def compute_mean_and_pca_basis(
     train_probe_dataloader: DataLoader, r: int = 32
