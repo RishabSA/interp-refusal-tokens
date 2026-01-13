@@ -8,6 +8,8 @@ from transformers import PreTrainedTokenizerBase
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 
+from scripts.low_rank_combination_steering import LowRankSteeringMap
+
 
 def generate_with_steering(
     prompt: str,
@@ -38,6 +40,9 @@ def generate_with_steering(
 
     strength = fixed_strength
 
+    low_rank_map = None
+    use_low_rank_map = False
+
     if steering_vector is None and get_steering_vector is not None:
         if fixed_strength is not None:
             steering_vector, strength = get_steering_vector(
@@ -58,22 +63,36 @@ def generate_with_steering(
                 "You must pass in values for either fixed_strength or benign_strength and harmful_strength"
             )
 
+        if isinstance(vector, LowRankSteeringMap):
+            low_rank_map = steering_vector  # weird naming
+            use_low_rank_map = True
+
     fwd_hooks = []
 
     if steering_vector is not None:
-        steering_vector = steering_vector.to(
-            hooked_model.cfg.device, dtype=next(hooked_model.parameters()).dtype
-        )
-
         hook_name = get_act_name(activation_name, layer)
 
-        hook_fn = partial(
-            steering_hook,
-            steering_vector,
-            None,
-            strength,
-            device,
-        )
+        if use_low_rank_map:
+            hook_fn = partial(
+                steering_hook,
+                None,
+                low_rank_map,
+                strength,
+                device,
+            )
+        else:
+            steering_vector = steering_vector.to(
+                hooked_model.cfg.device, dtype=next(hooked_model.parameters()).dtype
+            )
+
+            hook_fn = partial(
+                steering_hook,
+                steering_vector,
+                None,
+                strength,
+                device,
+            )
+
         fwd_hooks.append((hook_name, hook_fn))
 
     tokens = hooked_model.to_tokens(prompt).to(device)
@@ -156,7 +175,7 @@ def steering_hook(
     return out
 
 
-def get_categorical_steering_vector_old(
+def get_categorical_steering_vector_fixed(
     prompt: str,
     hooked_model: HookedTransformer,
     benign_strength: float,
@@ -194,3 +213,18 @@ def get_categorical_steering_vector_old(
             break
 
     return chosen_steering_vector, benign_strength
+
+
+def get_low_rank_map_steering_fixed(
+    prompt: str,
+    hooked_model: HookedTransformer,
+    benign_strength: float,
+    harmful_strength: float,
+    low_rank_map: LowRankSteeringMap,
+) -> tuple[LowRankSteeringMap, float]:
+    # Seperate strength variables for function call consistency
+    assert (
+        benign_strength == harmful_strength
+    ), "benign_strength and harmful_strength must have the same value"
+
+    return low_rank_map, benign_strength

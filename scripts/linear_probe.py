@@ -12,6 +12,8 @@ from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 from datasets import load_dataset, concatenate_datasets
 
+from scripts.low_rank_combination_steering import LowRankSteeringMap
+
 
 class LinearProbe(nn.Module):
     """1-layer linear probe that takes in [4096] residual-stream activations at a token position, which outputs 1 value for each item in the batch.
@@ -28,32 +30,6 @@ class LinearProbe(nn.Module):
     def forward(self, x: torch.Tensor):
         # x: (B, d_model)
         return self.head(x)  # shape: (B, 1)
-
-
-class LowRankProbe(nn.Module):
-    """1-layer low-rank linear probe that takes in [4096] residual-stream activations at a token position and first projects it into a lower-rank before passing it through a linear layer, which outputs 1 value for each item in the batch.
-
-    Args:
-        nn (_type_)
-    """
-
-    def __init__(self, U_r: torch.Tensor, d_model: int = 4096, rank: int = 64):
-        super().__init__()
-        # U_r is the tensor of shape (d_model, rank) from PCA
-        self.d_model = d_model
-        self.rank = rank
-
-        # Fixed projection (no grad) for classic low-rank probe
-        self.register_buffer("U_r", U_r.clone().detach())  # shape: (d, r)
-
-        self.head = nn.Linear(in_features=rank, out_features=1)
-
-    def forward(self, x: torch.Tensor):
-        # x: (B, d_model)
-
-        # Project to rank-r (B, r)
-        z = x @ self.U_r
-        return self.head(z)  # shape: (B, 1)
 
 
 def load_probe_model(
@@ -298,9 +274,9 @@ def get_categorical_steering_vector_probe(
         dim=1, index=refusal_token_ids
     )  # shape: (B, 5)
 
-    respond_prob = probs_next.index_select(
-        dim=1, index=torch.tensor(respond_token_id, device=device)
-    )  # shape: (B, 1)
+    # respond_prob = probs_next.index_select(
+    #     dim=1, index=torch.tensor(respond_token_id, device=device)
+    # )  # shape: (B, 1)
 
     top_refusal_prob, top_refusal_token_idx = refusal_probs.max(dim=1)
     top_refusal_token_id = refusal_token_ids[top_refusal_token_idx].item()
@@ -313,21 +289,59 @@ def get_categorical_steering_vector_probe(
 
         # print(f"Harmful: {top_refusal_token_id}, strength: {harmful_strength}")
         return steering_vector_mapping[top_refusal_token_id], harmful_strength
-
-        # if top_refusal_prob.item() > 0.5:
-        #     return None, 0.0
-        # else:
-        #     return steering_vector_mapping[top_refusal_token_id], harmful_strength
     else:
         # Benign
 
         # print(f"Benign: {top_refusal_token_id}, strength: {benign_strength}")
         return steering_vector_mapping[top_refusal_token_id], benign_strength
 
-        # if respond_prob.item() > 0.5:
-        #     return None, 0.0
-        # else:
-        #     return steering_vector_mapping[top_refusal_token_id], benign_strength
+
+def get_low_rank_map_steering_probe(
+    prompt: str,
+    hooked_model: HookedTransformer,
+    benign_strength: float,
+    harmful_strength: float,
+    low_rank_map: LowRankSteeringMap,
+    probe_model: nn.Module,
+    probe_threshold: float = 0.5,
+    activation_name: str = "resid_post",
+    layer: int = 18,
+    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+) -> tuple[LowRankSteeringMap, float]:
+    token_activation = None
+
+    hook_name = get_act_name(activation_name, layer)
+
+    def activation_hook(activation: torch.Tensor, hook: HookPoint):
+        nonlocal token_activation
+        token_activation = activation[:, -1, :].detach()
+
+    hooked_model.to(device).eval()
+    hooked_model.reset_hooks()
+
+    hooked_model.add_hook(hook_name, activation_hook, "fwd")
+
+    with torch.inference_mode():
+        tokens = hooked_model.to_tokens(prompt).to(device)
+        outputs = hooked_model(tokens)
+
+    hooked_model.reset_hooks()
+
+    token_activation = token_activation.to(device, dtype=torch.float32)
+
+    with torch.inference_mode():
+        harmful_score = torch.sigmoid(
+            probe_model(token_activation).squeeze(-1)
+        ).item()  # shape: (B)
+
+    harmful_decision = harmful_score >= probe_threshold
+
+    if harmful_decision:
+        # Harmful
+        return low_rank_map, harmful_strength
+    else:
+        # Benign
+        return low_rank_map, benign_strength
 
 
 def get_random_categorical_steering_vector_probe(

@@ -62,7 +62,6 @@ def compute_steering_vectors(
     mean_harmful_activations: dict[str, torch.Tensor],
     K: int | None = None,
     tau: float | None = None,
-    should_filter_shared: bool = False,
 ) -> dict[str, torch.Tensor]:
     steering_vectors = {}
 
@@ -99,11 +98,6 @@ def compute_steering_vectors(
             benign_mask = mean_benign.abs() >= tau
             harmful_mask = mean_harmful.abs() >= tau
 
-        if should_filter_shared:
-            # Filter out features that are shared between the mean category-specific harmful activations and the benign activations to isolate behavior-specific components
-            harmful_mask = harmful_mask & (~benign_mask)
-
-        if tau is not None or should_filter_shared:
             # Convert the bool masks to float masks to multiply
             benign_mask = benign_mask.float()
             harmful_mask = harmful_mask.float()

@@ -39,8 +39,10 @@ class LowRankSteeringMap(nn.Module):
 def train_low_rank_combination_steering_map(
     hooked_model: HookedTransformer,
     low_rank_steering_map: LowRankSteeringMap,
-    harmful_prompts_dataloader: DataLoader,
-    benign_prompts_dataloader: DataLoader,
+    harmful_training_prompts_dataloader: DataLoader,
+    benign_training_prompts_dataloader: DataLoader,
+    harmful_testing_prompts_dataloader: DataLoader,
+    benign_testing_prompts_dataloader: DataLoader,
     prompt_seq_append: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
     activation_name: str = "resid_post",
     layer: int = 18,
@@ -85,16 +87,24 @@ def train_low_rank_combination_steering_map(
     low_rank_steering_map.to(device).train()
 
     for epoch in tqdm(range(start_epoch, epochs), desc=f"Training for {epochs} epochs"):
-        total_harmful_loss = 0.0
-        total_kl_loss = 0.0
-        total_loss = 0.0
-        num_batches = 0
+        total_training_harmful_loss = 0.0
+        total_training_kl_loss = 0.0
+        total_training_loss = 0.0
+        num_training_batches = 0
 
+        total_testing_harmful_loss = 0.0
+        total_testing_kl_loss = 0.0
+        total_testing_loss = 0.0
+        num_testing_batches = 0
+
+        # Training
         for harmful_batch, benign_batch in tqdm(
-            zip(harmful_prompts_dataloader, benign_prompts_dataloader),
+            zip(
+                harmful_training_prompts_dataloader, benign_training_prompts_dataloader
+            ),
             desc=f"Training Low-Rank Mapping epoch {epoch + 1}",
         ):
-            num_batches += 1
+            num_training_batches += 1
 
             harmful_prompts = [
                 prompt + prompt_seq_append for prompt in harmful_batch["prompt"]
@@ -144,16 +154,16 @@ def train_low_rank_combination_steering_map(
             )  # shape: (batch_size)
 
             harmful_loss = -(summed_refusal_probs.log()).mean()
-            total_harmful_loss += harmful_loss.item()
+            total_training_harmful_loss += harmful_loss.item()
 
             # Benign KL divergence (keep the steered benign distribution close to base benign distribution)
             kl_loss = kl_divergence(
                 base_probs=base_benign_probs, steered_probs=steered_benign_probs
             )
-            total_kl_loss += kl_loss.item()
+            total_training_kl_loss += kl_loss.item()
 
             loss = harmful_loss + kl_loss_weight * kl_loss
-            total_loss += loss.item()
+            total_training_loss += loss.item()
 
             optimizer.zero_grad()
             loss.backward()
@@ -161,11 +171,87 @@ def train_low_rank_combination_steering_map(
 
             hooked_model.reset_hooks()
 
+        # Testing
+        for harmful_batch, benign_batch in tqdm(
+            zip(harmful_testing_prompts_dataloader, benign_testing_prompts_dataloader),
+            desc=f"Testing Low-Rank Mapping epoch {epoch + 1}",
+        ):
+            num_testing_batches += 1
+
+            harmful_prompts = [
+                prompt + prompt_seq_append for prompt in harmful_batch["prompt"]
+            ]
+            benign_prompts = [
+                prompt + prompt_seq_append for prompt in benign_batch["prompt"]
+            ]
+
+            harmful_tokens = hooked_model.to_tokens(harmful_prompts).to(device)
+            benign_tokens = hooked_model.to_tokens(benign_prompts).to(device)
+
+            hooked_model.reset_hooks()
+
+            # Base
+            with torch.inference_mode():
+                base_benign_logits = hooked_model(benign_tokens)[:, -1, :]
+                base_benign_probs = F.softmax(base_benign_logits, dim=-1).clamp_min(
+                    eps
+                )  # shape: (batch_size, vocab_size)
+
+            # Steered
+            hook_fn = partial(
+                steering_hook,
+                None,
+                low_rank_steering_map,
+                strength,
+                device,
+            )
+
+            hooked_model.add_hook(hook_name, hook_fn, "fwd")
+
+            with torch.inference_mode():
+                steered_benign_logits = hooked_model(benign_tokens)[:, -1, :]
+                steered_benign_probs = F.softmax(
+                    steered_benign_logits, dim=-1
+                ).clamp_min(
+                    eps
+                )  # shape: (batch_size, vocab_size)
+
+                steered_harmful_logits = hooked_model(harmful_tokens)[:, -1, :]
+                steered_harmful_probs = F.softmax(
+                    steered_harmful_logits, dim=-1
+                ).clamp_min(
+                    eps
+                )  # shape: (batch_size, vocab_size)
+
+            # Harmful refusal loss (maximize probability of refusal tokens)
+            summed_refusal_probs = steered_harmful_probs.index_select(
+                dim=1, index=refusal_token_ids
+            ).sum(
+                dim=1
+            )  # shape: (batch_size)
+
+            harmful_loss = -(summed_refusal_probs.log()).mean()
+            total_testing_harmful_loss += harmful_loss.item()
+
+            # Benign KL divergence (keep the steered benign distribution close to base benign distribution)
+            kl_loss = kl_divergence(
+                base_probs=base_benign_probs, steered_probs=steered_benign_probs
+            )
+            total_testing_kl_loss += kl_loss.item()
+
+            loss = harmful_loss + kl_loss_weight * kl_loss
+            total_testing_loss += loss.item()
+
+            hooked_model.reset_hooks()
+
         print(
             f"Epoch: {epoch + 1} "
-            f"| Harmful Loss: {total_harmful_loss / num_batches:.4f} "
-            f"| KL Loss: {total_kl_loss / num_batches:.4f} "
-            f"| Total Loss: {total_loss / num_batches:.4f}"
+            f"| Harmful Training Loss: {total_training_harmful_loss / num_training_batches:.4f} "
+            f"| KL Training Loss: {total_training_kl_loss / num_training_batches:.4f} "
+            f"| Total Training Loss: {total_training_loss / num_training_batches:.4f}"
+            f"| Harmful Testing Loss: {total_testing_harmful_loss / num_testing_batches:.4f} "
+            f"| KL Testing Loss: {total_testing_kl_loss / num_testing_batches:.4f} "
+            f"| Total Testing Loss: {total_testing_loss / num_testing_batches:.4f}"
         )
 
         checkpoint = {
