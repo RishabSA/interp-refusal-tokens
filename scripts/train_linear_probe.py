@@ -11,39 +11,11 @@ from torch.utils.data import (
 from sklearn.metrics import roc_curve, auc
 
 
-def compute_mean_and_pca_basis(
-    train_probe_dataloader: DataLoader, r: int = 32
-) -> tuple[torch.Tensor, torch.Tensor]:
-    features = []
-    with torch.no_grad():
-        for xb, _ in train_probe_dataloader:
-            features.append(xb.float().cpu())
-
-    X = torch.cat(features, dim=0)  # X shape: (N, d)
-
-    # Mean centering
-    X_mean = X.mean(dim=0, keepdim=True)  # shape: (1, d)
-    Xc = X - X_mean  # shape: (N, d)
-
-    # PCA via Singular Value Decomposition (SVD) on (N x d) features
-    # Xc = U S V^T with V: (d x d). Top-r right-singular vectors are columns of V[:, :r]
-
-    U, S, Vh = torch.linalg.svd(Xc, full_matrices=False)  # Vh shape: (d, d) transposed
-    V = Vh.transpose(0, 1)  # (d, d)
-    U_r = V[:, :r].contiguous()  # (d, r)
-
-    # Normalize to be safe (should already be orthonormal)
-    # U_r = torch.linalg.qr(U_r, mode="reduced")[0] # optional
-
-    # X_mean shape: (1, d), U_r shape: (d, r) for the PCA top-r
-    return X_mean.float(), U_r.float()
-
-
 def compute_mean(train_probe_dataloader: DataLoader) -> torch.Tensor:
     features = []
     with torch.no_grad():
-        for xb, _ in train_probe_dataloader:
-            features.append(xb.float().cpu())
+        for activations_batch, _ in train_probe_dataloader:
+            features.append(activations_batch.float().cpu())
 
     X = torch.cat(features, dim=0)  # X shape: (N, d)
 
@@ -119,7 +91,6 @@ def train_steering_linear_probe(
             ranks = torch.empty_like(order, dtype=torch.float32)
             ranks[order] = torch.arange(1, len(y_score) + 1, dtype=torch.float32)
 
-            # U = sum(ranks_pos) - n_pos * (n_pos + 1) / 2
             ranks_pos = ranks[pos]
 
             n_pos = ranks_pos.numel()
@@ -136,15 +107,15 @@ def train_steering_linear_probe(
         y_true = y_true.int().cpu()
         y_pred = y_pred.int().cpu()
 
-        tp = ((y_true == 1) & (y_pred == 1)).sum().item()
-        tn = ((y_true == 0) & (y_pred == 0)).sum().item()
-        fp = ((y_true == 0) & (y_pred == 1)).sum().item()
-        fn = ((y_true == 1) & (y_pred == 0)).sum().item()
+        true_positives = ((y_true == 1) & (y_pred == 1)).sum().item()
+        true_negatives = ((y_true == 0) & (y_pred == 0)).sum().item()
+        false_positives = ((y_true == 0) & (y_pred == 1)).sum().item()
+        false_negatives = ((y_true == 1) & (y_pred == 0)).sum().item()
 
-        harmful_acc = tp / (tp + fn + 1e-8)
-        benign_acc = tn / (tn + fp + 1e-8)
+        harmful_accuracy = true_positives / (true_positives + false_negatives + 1e-8)
+        benign_accuracy = true_negatives / (true_negatives + false_positives + 1e-8)
 
-        return benign_acc, harmful_acc
+        return benign_accuracy, harmful_accuracy
 
     def plot_roc_with_thresholds(
         fpr: np.ndarray, tpr: np.ndarray, thr: np.ndarray, annotate_every: int = 12
@@ -154,7 +125,7 @@ def train_steering_linear_probe(
         plt.figure()
 
         # Color points by threshold value
-        sc = plt.scatter(fpr, tpr, c=thr, s=18)
+        scatter = plt.scatter(fpr, tpr, c=thr, s=18)
         plt.plot(fpr, tpr, linewidth=1)
 
         # Diagonal reference
@@ -170,8 +141,8 @@ def train_steering_linear_probe(
                 fontsize=8,
             )
 
-        cbar = plt.colorbar(sc)
-        cbar.set_label("Threshold")
+        colorbar = plt.colorbar(scatter)
+        colorbar.set_label("Threshold")
 
         plt.xlim(0, 1)
         plt.ylim(0, 1.05)
@@ -195,48 +166,50 @@ def train_steering_linear_probe(
         probe_model.train()
         total_loss = 0.0
 
-        for xb, yb in tqdm(train_probe_dataloader, desc=f"Training epoch {epoch + 1}"):
-            xb, yb = xb.to(device), yb.to(device)
-            xb = center(xb)
+        for activations_batch, labels_batch in tqdm(
+            train_probe_dataloader, desc=f"Training epoch {epoch + 1}"
+        ):
+            activations_batch, labels_batch = activations_batch.to(
+                device
+            ), labels_batch.to(device)
 
-            logits = probe_model(xb).squeeze(-1)  # shape: (B)
-            loss = loss_fn(logits, yb)
+            activations_batch = center(activations_batch)
 
-            # loss_per = loss_fn(logits, yb) # shape: (B)
-            # weights = torch.where(yb == 1, weight_pos, weight_neg) # shape: (B)
-            # loss = (loss_per * weights).mean()
+            logits = probe_model(activations_batch).squeeze(-1)  # shape: (B)
+            loss = loss_fn(logits, labels_batch)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            total_loss += loss.item() * xb.size(0)
+            total_loss += loss.item() * activations_batch.size(0)
 
         # Validation
         probe_model.eval()
-        all_y = []
-        all_p = []
+        all_labels = []
+        all_probs = []
 
         with torch.inference_mode():
-            for xb, yb in tqdm(
+            for activations_batch, labels_batch in tqdm(
                 val_probe_dataloader, desc=f"Validation epoch {epoch + 1}"
             ):
-                xb = xb.to(device)
-                xb = center(xb)
+                activations_batch = activations_batch.to(device)
 
-                logits = probe_model(xb).squeeze(-1)
+                activations_batch = center(activations_batch)
+
+                logits = probe_model(activations_batch).squeeze(-1)
                 probs = torch.sigmoid(logits)
 
-                all_y.append(yb)
-                all_p.append(probs)
+                all_labels.append(labels_batch)
+                all_probs.append(probs)
 
-        all_y = torch.cat(all_y, dim=0)
-        all_p = torch.cat(all_p, dim=0)
-        val_auc = compute_auc(all_y, all_p)
+        all_labels = torch.cat(all_labels, dim=0)
+        all_probs = torch.cat(all_probs, dim=0)
+        val_auc = compute_auc(all_labels, all_probs)
 
         if use_calibrated_threshold:
-            y_val_np = all_y.cpu().numpy().astype(int)
-            p_val_np = all_p.cpu().numpy()
+            y_val_np = all_labels.cpu().numpy().astype(int)
+            p_val_np = all_probs.cpu().numpy()
 
             fpr, tpr, thr = roc_curve(y_val_np, p_val_np)
 
@@ -252,11 +225,11 @@ def train_steering_linear_probe(
                 f"Using a calibrated threshold of {probe_threshold} with FPR: {best_fpr}, TPR: {best_tpr}, and J: {best_J}"
             )
 
-        val_preds = (all_p >= probe_threshold).float()
+        val_preds = (all_probs >= probe_threshold).float()
 
         # Calculate accuracy
-        val_acc = (val_preds.cpu() == all_y.cpu()).float().mean().item()
-        val_benign_acc, val_harmful_acc = per_class_accuracy(all_y, val_preds)
+        val_acc = (val_preds.cpu() == all_labels.cpu()).float().mean().item()
+        val_benign_acc, val_harmful_acc = per_class_accuracy(all_labels, val_preds)
 
         # Test
         probe_model.eval()
@@ -264,16 +237,17 @@ def train_steering_linear_probe(
         all_test_p = []
 
         with torch.inference_mode():
-            for xb, yb in tqdm(
+            for activations_batch, labels_batch in tqdm(
                 test_probe_dataloader, desc=f"Testing epoch {epoch + 1}"
             ):
-                xb = xb.to(device)
-                xb = center(xb)
+                activations_batch = activations_batch.to(device)
 
-                logits = probe_model(xb).squeeze(-1)
+                activations_batch = center(activations_batch)
+
+                logits = probe_model(activations_batch).squeeze(-1)
                 probs = torch.sigmoid(logits)
 
-                all_test_y.append(yb)
+                all_test_y.append(labels_batch)
                 all_test_p.append(probs)
 
         all_test_y = torch.cat(all_test_y, dim=0)

@@ -146,6 +146,23 @@ def train_low_rank_combination_steering_map(
 
             hooked_model.reset_hooks()
 
+            del (
+                harmful_tokens,
+                benign_tokens,
+                base_benign_logits,
+                base_benign_probs,
+                steered_benign_logits,
+                steered_benign_probs,
+                steered_harmful_logits,
+                steered_harmful_probs,
+                summed_refusal_probs,
+                harmful_loss,
+                kl_loss,
+                loss,
+            )
+
+            torch.cuda.empty_cache()
+
         # Testing
         for harmful_batch, benign_batch in tqdm(
             zip(harmful_testing_prompts_dataloader, benign_testing_prompts_dataloader),
@@ -218,6 +235,23 @@ def train_low_rank_combination_steering_map(
             total_testing_loss += loss.item()
 
             hooked_model.reset_hooks()
+
+            del (
+                harmful_tokens,
+                benign_tokens,
+                base_benign_logits,
+                base_benign_probs,
+                steered_benign_logits,
+                steered_benign_probs,
+                steered_harmful_logits,
+                steered_harmful_probs,
+                summed_refusal_probs,
+                harmful_loss,
+                kl_loss,
+                loss,
+            )
+
+            torch.cuda.empty_cache()
 
         print(
             f"Epoch: {epoch + 1} "
