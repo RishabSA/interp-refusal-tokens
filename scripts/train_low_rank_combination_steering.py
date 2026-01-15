@@ -1,6 +1,7 @@
 import os
 from functools import partial
 from tqdm.auto import tqdm
+from tqdm.contrib import tzip
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -73,10 +74,9 @@ def train_low_rank_combination_steering_map(
         num_testing_batches = 0
 
         # Training
-        for harmful_batch, benign_batch in tqdm(
-            zip(
-                harmful_training_prompts_dataloader, benign_training_prompts_dataloader
-            ),
+        for harmful_batch, benign_batch in tzip(
+            harmful_training_prompts_dataloader,
+            benign_training_prompts_dataloader,
             desc=f"Training Low-Rank Mapping epoch {epoch + 1}",
         ):
             num_training_batches += 1
@@ -161,11 +161,10 @@ def train_low_rank_combination_steering_map(
                 loss,
             )
 
-            torch.cuda.empty_cache()
-
         # Testing
-        for harmful_batch, benign_batch in tqdm(
-            zip(harmful_testing_prompts_dataloader, benign_testing_prompts_dataloader),
+        for harmful_batch, benign_batch in tzip(
+            harmful_testing_prompts_dataloader,
+            benign_testing_prompts_dataloader,
             desc=f"Testing Low-Rank Mapping epoch {epoch + 1}",
         ):
             num_testing_batches += 1
@@ -250,8 +249,6 @@ def train_low_rank_combination_steering_map(
                 kl_loss,
                 loss,
             )
-
-            torch.cuda.empty_cache()
 
         print(
             f"Epoch: {epoch + 1} "

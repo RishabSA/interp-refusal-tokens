@@ -5,11 +5,20 @@ from datasets import load_dataset, concatenate_datasets
 
 def get_prompt_training_data(
     batch_size: int = 4,
+    load_datasets: list[str] = [
+        "coconot",
+        "wildguard",
+        "or_bench",
+        "truthful_qa",
+        "gsm8k",
+        "mmlu",
+    ],
 ) -> tuple[DataLoader, DataLoader]:
     """Get dataloaders containing prompts used for training.
 
     Args:
         batch_size (int, optional). Defaults to 4.
+        load_datasets (list[str], optional). Defaults to Defaults to ["coconot", "wildguard", "or_bench", "truthful_qa", "gsm8k", "mmlu"].
 
     Returns:
         tuple[DataLoader, DataLoader]: Dataloaders containing harmful and benign prompts used for training.
@@ -20,62 +29,71 @@ def get_prompt_training_data(
             "prompt": [sample["prompt"] for sample in batch],
         }
 
-    # COCONot Dataset loading
-    coconot_orig = load_dataset("allenai/coconot", "original")  # 12.5k items
-    coconot_contrast = load_dataset("allenai/coconot", "contrast")  # 379 items
+    harmful_datasets = []
+    benign_datasets = []
 
-    # WildGuardMix Dataset loading
-    wildguard_train = load_dataset(
-        "allenai/wildguardmix", "wildguardtrain"
-    )  # 1.73k items
+    if "coconot" in load_datasets:
+        # COCONot Dataset loading
+        coconot_orig = load_dataset("allenai/coconot", "original")
 
-    wildguard_train_harmful = wildguard_train["train"].filter(
-        lambda x: x["prompt_harm_label"] == "harmful"
-    )
+        harmful_datasets.append(coconot_orig["train"])  # 12.5k items
 
-    wildguard_train_benign = wildguard_train["train"].filter(
-        lambda x: x["prompt_harm_label"] == "unharmful"
-    )
+    if "wildguard" in load_datasets:
+        # WildGuardMix Dataset loading
+        wildguard_train = load_dataset(
+            "allenai/wildguardmix", "wildguardtrain"
+        )  # 1.73k items
 
-    # OR-Bench
-    or_bench_80k = load_dataset("bench-llm/or-bench", "or-bench-80k")  # 80k items
-    or_bench_hard = load_dataset(
-        "bench-llm/or-bench", "or-bench-hard-1k"
-    )  # 1.32k items
-    or_bench_toxic = load_dataset("bench-llm/or-bench", "or-bench-toxic")  # 655 item
+        wildguard_train_harmful = wildguard_train["train"].filter(
+            lambda x: x["prompt_harm_label"] == "harmful"
+        )
 
-    # TruthfulQA
-    truthful_qa_gen = load_dataset("truthfulqa/truthful_qa", "generation")
-    truthful_qa_gen = truthful_qa_gen.rename_column("question", "prompt")
+        wildguard_train_benign = wildguard_train["train"].filter(
+            lambda x: x["prompt_harm_label"] == "unharmful"
+        )
 
-    # GSM8k
-    gsm8k = load_dataset("openai/gsm8k", "main")
-    gsm8k = gsm8k.rename_column("question", "prompt")
+        harmful_datasets.append(wildguard_train_harmful)
+        benign_datasets.append(wildguard_train_benign)
 
-    # MMLU
-    mmlu = load_dataset("cais/mmlu", "all")
-    mmlu = mmlu.rename_column("question", "prompt")
-    mmlu = mmlu.remove_columns("answer")
+    if "or_bench" in load_datasets:
+        # OR-Bench
+        or_bench_80k = load_dataset("bench-llm/or-bench", "or-bench-80k")
 
-    harmful_probe_dataset = concatenate_datasets(
-        [
-            coconot_orig["train"],
-            wildguard_train_harmful,
-            or_bench_80k["train"],
-        ]
-    )
+        harmful_datasets.append(or_bench_80k["train"])  # 80k items
 
-    benign_probe_dataset = concatenate_datasets(
-        [
-            wildguard_train_benign,
-            truthful_qa_gen["validation"],
-            gsm8k["train"],
-            mmlu["auxiliary_train"],
-        ]
-    )
+    if "truthful_qa" in load_datasets:
+        # TruthfulQA
+        truthful_qa_gen = load_dataset("truthfulqa/truthful_qa", "generation")
+        truthful_qa_gen = truthful_qa_gen.rename_column("question", "prompt")
 
-    harmful_probe_dataloader = DataLoader(
-        harmful_probe_dataset,
+        benign_datasets.append(truthful_qa_gen["validation"])  # 817 items
+
+    if "gsm8k" in load_datasets:
+        # GSM8k
+        gsm8k = load_dataset("openai/gsm8k", "main")
+        gsm8k = gsm8k.rename_column("question", "prompt")
+
+        benign_datasets.append(gsm8k["train"])  # 7.47k items
+
+    if "mmlu" in load_datasets:
+        # MMLU
+        mmlu = load_dataset("cais/mmlu", "all")
+        mmlu = mmlu.rename_column("question", "prompt")
+        mmlu = mmlu.remove_columns("answer")
+
+        benign_datasets.append(mmlu["auxiliary_train"])  # 99.8k
+
+    if len(harmful_datasets) == 0:
+        raise ValueError("No harmful datasets were passed in")
+
+    if len(benign_datasets) == 0:
+        raise ValueError("No benign datasets were passed in")
+
+    harmful_prompt_dataset = concatenate_datasets(harmful_datasets)
+    benign_prompt_dataset = concatenate_datasets(benign_datasets)
+
+    harmful_prompt_dataloader = DataLoader(
+        harmful_prompt_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=os.cpu_count(),
@@ -83,8 +101,8 @@ def get_prompt_training_data(
         collate_fn=prompt_category_collate,
     )
 
-    benign_probe_dataloader = DataLoader(
-        benign_probe_dataset,
+    benign_prompt_dataloader = DataLoader(
+        benign_prompt_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=os.cpu_count(),
@@ -92,14 +110,25 @@ def get_prompt_training_data(
         collate_fn=prompt_category_collate,
     )
 
-    return harmful_probe_dataloader, benign_probe_dataloader
+    return harmful_prompt_dataloader, benign_prompt_dataloader
 
 
-def get_prompt_testing_data(batch_size: int = 4) -> tuple[DataLoader, DataLoader]:
+def get_prompt_testing_data(
+    batch_size: int = 4,
+    load_datasets: list[str] = [
+        "coconot",
+        "wildguard",
+        "or_bench",
+        "wildjailbreak",
+        "gsm8k",
+        "mmlu",
+    ],
+) -> tuple[DataLoader, DataLoader]:
     """Get dataloaders containing prompts used for testing.
 
     Args:
         batch_size (int, optional). Defaults to 4.
+        load_datasets (list[str], optional). Defaults to Defaults to ["coconot", "wildguard", "or_bench", "wildjailbreak", "gsm8k", "mmlu"].
 
     Returns:
         tuple[DataLoader, DataLoader]: Dataloaders containing harmful and benign prompts used for testing.
@@ -110,75 +139,86 @@ def get_prompt_testing_data(batch_size: int = 4) -> tuple[DataLoader, DataLoader
             "prompt": [sample["prompt"] for sample in batch],
         }
 
-    # COCONot Dataset loading
-    coconot_orig = load_dataset("allenai/coconot", "original")  # 12.5k items
-    coconot_contrast = load_dataset("allenai/coconot", "contrast")  # 379 items
+    harmful_datasets = []
+    benign_datasets = []
 
-    # WildGuardMix Dataset loading
-    wildguard_test = load_dataset(
-        "allenai/wildguardmix", "wildguardtest"
-    )  # 1.73k items
+    if "coconot" in load_datasets:
+        # COCONot Dataset loading
+        coconot_orig = load_dataset("allenai/coconot", "original")
+        coconot_contrast = load_dataset("allenai/coconot", "contrast")
 
-    wildguard_test_harmful = wildguard_test["test"].filter(
-        lambda x: x["prompt_harm_label"] == "harmful"
-    )
+        harmful_datasets.append(coconot_orig["test"])  # 12.5k items
+        benign_datasets.append(coconot_contrast["test"])  # 379 items
 
-    wildguard_test_benign = wildguard_test["test"].filter(
-        lambda x: x["prompt_harm_label"] == "unharmful"
-    )
+    if "wildguard" in load_datasets:
+        # WildGuardMix Dataset loading
+        wildguard_test = load_dataset(
+            "allenai/wildguardmix", "wildguardtest"
+        )  # 1.73k items
 
-    # OR-Bench
-    or_bench_hard = load_dataset(
-        "bench-llm/or-bench", "or-bench-hard-1k"
-    )  # 1.32k items
-    or_bench_toxic = load_dataset("bench-llm/or-bench", "or-bench-toxic")  # 655 item
+        wildguard_test_harmful = wildguard_test["test"].filter(
+            lambda x: x["prompt_harm_label"] == "harmful"
+        )
 
-    # TruthfulQA
-    truthful_qa_gen = load_dataset("truthfulqa/truthful_qa", "generation")
-    truthful_qa_gen = truthful_qa_gen.rename_column("question", "prompt")
+        wildguard_test_benign = wildguard_test["test"].filter(
+            lambda x: x["prompt_harm_label"] == "unharmful"
+        )
 
-    wildjailbreak_eval = load_dataset("allenai/wildjailbreak", "eval")  # 2.21k items
-    wildjailbreak_eval = wildjailbreak_eval.rename_column("adversarial", "prompt")
+        harmful_datasets.append(wildguard_test_harmful)
+        benign_datasets.append(wildguard_test_benign)
 
-    # GSM8k
-    gsm8k = load_dataset("openai/gsm8k", "main")
-    gsm8k = gsm8k.rename_column("question", "prompt")
+    if "or_bench" in load_datasets:
+        # OR-Bench
+        or_bench_toxic = load_dataset("bench-llm/or-bench", "or-bench-toxic")
+        or_bench_hard = load_dataset("bench-llm/or-bench", "or-bench-hard-1k")
 
-    # MMLU
-    mmlu = load_dataset("cais/mmlu", "all")
-    mmlu = mmlu.rename_column("question", "prompt")
-    mmlu = mmlu.remove_columns("answer")
+        harmful_datasets.append(or_bench_toxic["train"])  # 655 item
+        benign_datasets.append(or_bench_hard["train"])  # 1.32k items
 
-    wildjailbreak_eval_harmful = wildjailbreak_eval["train"].filter(
-        lambda x: x["data_type"] == "vanilla_harmful"
-    )
+    if "wildjailbreak" in load_datasets:
+        # WildJailbreak Dataset Loading
+        wildjailbreak_eval = load_dataset(
+            "allenai/wildjailbreak", "eval"
+        )  # 2.21k items
+        wildjailbreak_eval = wildjailbreak_eval.rename_column("adversarial", "prompt")
 
-    wildjailbreak_eval_benign = wildjailbreak_eval["train"].filter(
-        lambda x: x["data_type"] == "vanilla_benign"
-    )
+        wildjailbreak_eval_harmful = wildjailbreak_eval["train"].filter(
+            lambda x: x["data_type"] == "vanilla_harmful"
+        )
 
-    harmful_probe_dataset = concatenate_datasets(
-        [
-            coconot_orig["test"],
-            wildguard_test_harmful,
-            or_bench_toxic["train"],
-            wildjailbreak_eval_harmful,
-        ]
-    )
+        wildjailbreak_eval_benign = wildjailbreak_eval["train"].filter(
+            lambda x: x["data_type"] == "vanilla_benign"
+        )
 
-    benign_probe_dataset = concatenate_datasets(
-        [
-            coconot_contrast["test"],
-            wildguard_test_benign,
-            or_bench_hard["train"],
-            gsm8k["test"],
-            mmlu["test"],
-            wildjailbreak_eval_benign,
-        ]
-    )
+        harmful_datasets.append(wildjailbreak_eval_harmful)
+        benign_datasets.append(wildjailbreak_eval_benign)
 
-    harmful_probe_dataloader = DataLoader(
-        harmful_probe_dataset,
+    if "gsm8k" in load_datasets:
+        # GSM8k
+        gsm8k = load_dataset("openai/gsm8k", "main")
+        gsm8k = gsm8k.rename_column("question", "prompt")
+
+        benign_datasets.append(gsm8k["test"])  # 1.32k items
+
+    if "mmlu" in load_datasets:
+        # MMLU
+        mmlu = load_dataset("cais/mmlu", "all")
+        mmlu = mmlu.rename_column("question", "prompt")
+        mmlu = mmlu.remove_columns("answer")
+
+        benign_datasets.append(mmlu["test"])  # 14k
+
+    if len(harmful_datasets) == 0:
+        raise ValueError("No harmful datasets were passed in")
+
+    if len(benign_datasets) == 0:
+        raise ValueError("No benign datasets were passed in")
+
+    harmful_prompt_dataset = concatenate_datasets(harmful_datasets)
+    benign_prompt_dataset = concatenate_datasets(benign_datasets)
+
+    harmful_prompt_dataloader = DataLoader(
+        harmful_prompt_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=os.cpu_count(),
@@ -186,8 +226,8 @@ def get_prompt_testing_data(batch_size: int = 4) -> tuple[DataLoader, DataLoader
         collate_fn=prompt_category_collate,
     )
 
-    benign_probe_dataloader = DataLoader(
-        benign_probe_dataset,
+    benign_prompt_dataloader = DataLoader(
+        benign_prompt_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=os.cpu_count(),
@@ -195,4 +235,4 @@ def get_prompt_testing_data(batch_size: int = 4) -> tuple[DataLoader, DataLoader
         collate_fn=prompt_category_collate,
     )
 
-    return harmful_probe_dataloader, benign_probe_dataloader
+    return harmful_prompt_dataloader, benign_prompt_dataloader
