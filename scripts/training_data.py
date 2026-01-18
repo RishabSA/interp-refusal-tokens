@@ -40,17 +40,15 @@ def get_prompt_training_data(
 
     if "wildguard" in load_datasets:
         # WildGuardMix Dataset loading
-        wildguard_train = load_dataset(
-            "allenai/wildguardmix", "wildguardtrain"
-        )  # 1.73k items
+        wildguard_train = load_dataset("allenai/wildguardmix", "wildguardtrain")
 
         wildguard_train_harmful = wildguard_train["train"].filter(
             lambda x: x["prompt_harm_label"] == "harmful"
-        )
+        )  # 46.3k items
 
         wildguard_train_benign = wildguard_train["train"].filter(
             lambda x: x["prompt_harm_label"] == "unharmful"
-        )
+        )  # 40.5k
 
         harmful_datasets.append(wildguard_train_harmful)
         benign_datasets.append(wildguard_train_benign)
@@ -158,11 +156,11 @@ def get_prompt_testing_data(
 
         wildguard_test_harmful = wildguard_test["test"].filter(
             lambda x: x["prompt_harm_label"] == "harmful"
-        )
+        )  # 756 items
 
         wildguard_test_benign = wildguard_test["test"].filter(
             lambda x: x["prompt_harm_label"] == "unharmful"
-        )
+        )  # 948 items
 
         harmful_datasets.append(wildguard_test_harmful)
         benign_datasets.append(wildguard_test_benign)

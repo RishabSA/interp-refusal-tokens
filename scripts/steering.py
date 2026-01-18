@@ -63,7 +63,7 @@ def generate_with_steering(
                 "You must pass in values for either fixed_strength or benign_strength and harmful_strength"
             )
 
-        if isinstance(vector, LowRankSteeringMap):
+        if isinstance(steering_vector, LowRankSteeringMap):
             low_rank_map = steering_vector  # weird naming
             use_low_rank_map = True
 

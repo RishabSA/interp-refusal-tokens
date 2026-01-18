@@ -834,6 +834,8 @@ def steering_evaluation_layer_sweep(
 
         contrastive_generate_outputs_dataset_categorical_steered_eval = partial(
             generate_outputs_dataset,
+            model=hooked_model,
+            tokenizer=tokenizer,
             steering_vector=None,
             get_steering_vector=contrastive_get_categorical_steering_vector_hook,
             fixed_strength=None,
@@ -847,10 +849,13 @@ def steering_evaluation_layer_sweep(
             temperature=1.0,
             append_seq="<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
             stop_tokens=["<|eot_id|>"],
+            model_name=model_name,
             device=device,
         )
         old_generate_outputs_dataset_categorical_steered_eval = partial(
             generate_outputs_dataset,
+            model=hooked_model,
+            tokenizer=tokenizer,
             steering_vector=None,
             get_steering_vector=old_get_categorical_steering_vector_hook,
             fixed_strength=None,
@@ -864,6 +869,7 @@ def steering_evaluation_layer_sweep(
             temperature=1.0,
             append_seq="<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
             stop_tokens=["<|eot_id|>"],
+            model_name=model_name,
             device=device,
         )
 
@@ -871,12 +877,9 @@ def steering_evaluation_layer_sweep(
         for strength in [1.0]:
             # COCONot Original Subset Test Generation
             _ = contrastive_generate_outputs_dataset_categorical_steered_eval(
-                model=hooked_model,
-                tokenizer=tokenizer,
                 iterator=coconot_orig_iterator,
                 description=f"CONTRASTIVE COCONot Original Test Generation at layer {layer}",
                 outputs_save_path=f"contrastive_orig_{strength}_sweep_layer_{layer}.jsonl",
-                model_name=model_name,
                 fixed_strength=strength,
             )
 
@@ -899,12 +902,9 @@ def steering_evaluation_layer_sweep(
         for strength in [-2.0, -4.0, -6.0]:
             # COCONot Contrast Subset Test Generation
             _ = contrastive_generate_outputs_dataset_categorical_steered_eval(
-                model=hooked_model,
-                tokenizer=tokenizer,
                 iterator=coconot_contrast_iterator,
                 description=f"CONTRASTIVE COCONot Contrast Test Generation at layer {layer}",
                 outputs_save_path=f"contrastive_contrast_{strength}_sweep_layer_{layer}.jsonl",
-                model_name=model_name,
                 fixed_strength=strength,
             )
 
@@ -927,12 +927,9 @@ def steering_evaluation_layer_sweep(
         for strength in [1.0]:
             # COCONot Original Subset Test Generation
             _ = old_generate_outputs_dataset_categorical_steered_eval(
-                model=hooked_model,
-                tokenizer=tokenizer,
                 iterator=coconot_orig_iterator,
                 description=f"OLD COCONot Original Test Generation at layer {layer}",
                 outputs_save_path=f"old_orig_{strength}_sweep_layer_{layer}.jsonl",
-                model_name=model_name,
                 fixed_strength=strength,
             )
 
@@ -953,12 +950,9 @@ def steering_evaluation_layer_sweep(
         for strength in [-2.0, -4.0, -6.0]:
             # COCONot Contrast Subset Test Generation
             _ = old_generate_outputs_dataset_categorical_steered_eval(
-                model=hooked_model,
-                tokenizer=tokenizer,
                 iterator=coconot_contrast_iterator,
                 description=f"OLD COCONot Contrast Test Generation at layer {layer}",
                 outputs_save_path=f"old_contrast_{strength}_sweep_layer_{layer}.jsonl",
-                model_name=model_name,
                 fixed_strength=strength,
             )
 

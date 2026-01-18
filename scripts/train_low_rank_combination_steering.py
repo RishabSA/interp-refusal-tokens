@@ -37,6 +37,18 @@ def train_low_rank_combination_steering_map(
 
         return (base_probs * (base_probs / steered_probs).log()).sum(dim=-1).mean()
 
+    def kl_divergence_from_logits(
+        base_logits: torch.Tensor,
+        steered_logits: torch.Tensor,
+    ) -> torch.Tensor:
+        # Compute with 32-bit precision for stability
+        base_log_probs = F.log_softmax(base_logits.float(), dim=-1)
+        steered_log_probs = F.log_softmax(steered_logits.float(), dim=-1)
+
+        base_probs = base_log_probs.exp()
+
+        return (base_probs * (base_log_probs - steered_log_probs)).sum(dim=-1).mean()
+
     refusal_token_ids = torch.tensor(
         [128256, 128257, 128258, 128259, 128260], device=device, dtype=torch.long
     )
@@ -73,12 +85,25 @@ def train_low_rank_combination_steering_map(
         total_testing_loss = 0.0
         num_testing_batches = 0
 
-        # Training
-        for harmful_batch, benign_batch in tzip(
-            harmful_training_prompts_dataloader,
-            benign_training_prompts_dataloader,
+        # training_pbar = tzip(
+        #     harmful_training_prompts_dataloader,
+        #     benign_training_prompts_dataloader,
+        #     desc=f"Training Low-Rank Mapping epoch {epoch + 1}",
+        # )
+
+        training_pbar = tqdm(
+            zip(
+                harmful_training_prompts_dataloader, benign_training_prompts_dataloader
+            ),
+            total=min(
+                len(harmful_training_prompts_dataloader),
+                len(benign_training_prompts_dataloader),
+            ),
             desc=f"Training Low-Rank Mapping epoch {epoch + 1}",
-        ):
+        )
+
+        # Training
+        for harmful_batch, benign_batch in training_pbar:
             num_training_batches += 1
 
             harmful_prompts = [
@@ -132,8 +157,12 @@ def train_low_rank_combination_steering_map(
             total_training_harmful_loss += harmful_loss.item()
 
             # Benign KL divergence (keep the steered benign distribution close to base benign distribution)
-            kl_loss = kl_divergence(
-                base_probs=base_benign_probs, steered_probs=steered_benign_probs
+            # kl_loss = kl_divergence(
+            #     base_probs=base_benign_probs, steered_probs=steered_benign_probs
+            # )
+
+            kl_loss = kl_divergence_from_logits(
+                base_logits=base_benign_logits, steered_logits=steered_benign_logits
             )
             total_training_kl_loss += kl_loss.item()
 
@@ -145,6 +174,12 @@ def train_low_rank_combination_steering_map(
             optimizer.step()
 
             hooked_model.reset_hooks()
+
+            training_pbar.set_postfix(
+                harmful_loss=f"{harmful_loss.item():.6f}",
+                kl_loss=f"{kl_loss.item():.6f}",
+                loss=f"{loss.item():.6f}",
+            )
 
             del (
                 harmful_tokens,
@@ -161,12 +196,23 @@ def train_low_rank_combination_steering_map(
                 loss,
             )
 
-        # Testing
-        for harmful_batch, benign_batch in tzip(
-            harmful_testing_prompts_dataloader,
-            benign_testing_prompts_dataloader,
+        # testing_pbar = tzip(
+        #     harmful_testing_prompts_dataloader,
+        #     benign_testing_prompts_dataloader,
+        #     desc=f"Testing Low-Rank Mapping epoch {epoch + 1}",
+        # )
+
+        testing_pbar = tqdm(
+            zip(harmful_testing_prompts_dataloader, benign_testing_prompts_dataloader),
+            total=min(
+                len(harmful_testing_prompts_dataloader),
+                len(benign_testing_prompts_dataloader),
+            ),
             desc=f"Testing Low-Rank Mapping epoch {epoch + 1}",
-        ):
+        )
+
+        # Testing
+        for harmful_batch, benign_batch in testing_pbar:
             num_testing_batches += 1
 
             harmful_prompts = [
@@ -225,8 +271,12 @@ def train_low_rank_combination_steering_map(
             total_testing_harmful_loss += harmful_loss.item()
 
             # Benign KL divergence (keep the steered benign distribution close to base benign distribution)
-            kl_loss = kl_divergence(
-                base_probs=base_benign_probs, steered_probs=steered_benign_probs
+            # kl_loss = kl_divergence(
+            #     base_probs=base_benign_probs, steered_probs=steered_benign_probs
+            # )
+
+            kl_loss = kl_divergence_from_logits(
+                base_logits=base_benign_logits, steered_logits=steered_benign_logits
             )
             total_testing_kl_loss += kl_loss.item()
 
@@ -234,6 +284,12 @@ def train_low_rank_combination_steering_map(
             total_testing_loss += loss.item()
 
             hooked_model.reset_hooks()
+
+            testing_pbar.set_postfix(
+                harmful_loss=f"{harmful_loss.item():.6f}",
+                kl_loss=f"{kl_loss.item():.6f}",
+                loss=f"{loss.item():.6f}",
+            )
 
             del (
                 harmful_tokens,

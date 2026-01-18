@@ -58,7 +58,7 @@ def compute_contrastive_steering_vectors(
 
 
 def compute_steering_vectors(
-    mean_benign_activations: dict[str, torch.Tensor],
+    mean_benign_activations: torch.Tensor,
     mean_harmful_activations: dict[str, torch.Tensor],
     K: int | None = None,
     tau: float | None = None,
@@ -80,30 +80,30 @@ def compute_steering_vectors(
         # Prevent division by 0 error
         return vector / norm if norm > 0 else vector
 
-    for (
-        (harmful_category, mean_harmful),
-        (benign_category, mean_benign),
-    ) in zip(
-        mean_harmful_activations.items(),
-        mean_benign_activations.items(),
-    ):
-        if harmful_category != benign_category:
-            print("Error: harmful and benign are not the same category")
-            break
+    mean_benign = mean_benign_activations
+    if tau is not None:
+        # Filter out inactive features with values < tau
+        # boolean mask of shape (d_model)
 
+        benign_mask = mean_benign.abs() >= tau
+
+        # Convert the bool masks to float masks to multiply
+        benign_mask = benign_mask.float()
+
+        # Apply the masks to each of the mean features
+        mean_benign = mean_benign * benign_mask
+
+    for harmful_category, mean_harmful in mean_harmful_activations.items():
         if tau is not None:
             # Filter out inactive features with values < tau
             # boolean mask of shape (d_model)
 
-            benign_mask = mean_benign.abs() >= tau
             harmful_mask = mean_harmful.abs() >= tau
 
             # Convert the bool masks to float masks to multiply
-            benign_mask = benign_mask.float()
             harmful_mask = harmful_mask.float()
 
             # Apply the masks to each of the mean features
-            mean_benign = mean_benign * benign_mask
             mean_harmful = mean_harmful * harmful_mask
 
         # Subtract the mean benign activations from the mean category-specific harmful activations to get the steering vector for the specific category
