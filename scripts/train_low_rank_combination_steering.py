@@ -85,12 +85,6 @@ def train_low_rank_combination_steering_map(
         total_testing_loss = 0.0
         num_testing_batches = 0
 
-        # training_pbar = tzip(
-        #     harmful_training_prompts_dataloader,
-        #     benign_training_prompts_dataloader,
-        #     desc=f"Training Low-Rank Mapping epoch {epoch + 1}",
-        # )
-
         training_pbar = tqdm(
             zip(
                 harmful_training_prompts_dataloader, benign_training_prompts_dataloader
@@ -131,7 +125,6 @@ def train_low_rank_combination_steering_map(
                 None,
                 low_rank_map,
                 strength,
-                device,
             )
 
             hooked_model.add_hook(hook_name, hook_fn, "fwd")
@@ -196,12 +189,6 @@ def train_low_rank_combination_steering_map(
                 loss,
             )
 
-        # testing_pbar = tzip(
-        #     harmful_testing_prompts_dataloader,
-        #     benign_testing_prompts_dataloader,
-        #     desc=f"Testing Low-Rank Mapping epoch {epoch + 1}",
-        # )
-
         testing_pbar = tqdm(
             zip(harmful_testing_prompts_dataloader, benign_testing_prompts_dataloader),
             total=min(
@@ -240,7 +227,6 @@ def train_low_rank_combination_steering_map(
                 None,
                 low_rank_map,
                 strength,
-                device,
             )
 
             hooked_model.add_hook(hook_name, hook_fn, "fwd")

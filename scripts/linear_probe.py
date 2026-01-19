@@ -1,5 +1,4 @@
 import os
-import json
 import pandas as pd
 import random
 from collections import defaultdict
@@ -28,15 +27,15 @@ class LinearProbe(nn.Module):
         self.head = nn.Linear(in_features=d_model, out_features=1)
 
     def forward(self, x: torch.Tensor):
-        # x: (B, d_model)
-        return self.head(x)  # shape: (B, 1)
+        # x: (batch_size, d_model)
+        return self.head(x)  # shape: (batch_size, 1)
 
 
 def load_probe_model(
     probe_model: nn.Module,
     path: str = "steering_probe_18.pt",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-) -> tuple[nn.Module, int]:
+) -> tuple[nn.Module, int, torch.Tensor]:
     """Loads a linear probe from a given path onto the device and returns both the model and the threshold
 
     Args:
@@ -51,13 +50,14 @@ def load_probe_model(
     probe_model.load_state_dict(checkpoint["model_state_dict"])
     probe_model.eval()
 
-    return probe_model, checkpoint.get("threshold", 0.5)
+    return probe_model, checkpoint.get("threshold", 0.5), checkpoint.get("X_mean")
 
 
 def analyze_probe_direction_with_activations(
     prompts_dict: dict[str, list[str]],
     activations_dict: dict[str, torch.Tensor],
     probe_model: nn.Module,
+    probe_X_mean: torch.Tensor,
     K: int = 10,
     outputs_save_path: str = "probe_direction_analysis.jsonl",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -71,6 +71,11 @@ def analyze_probe_direction_with_activations(
     for category, activations in activations_dict.items():
         prompts = prompts_dict[category]
         categorical_activations = activations.to(device, dtype=torch.float32)
+
+        # Center activations
+        categorical_activations = categorical_activations - probe_X_mean.to(
+            device, dtype=torch.float32
+        )
 
         for i in range(categorical_activations.shape[0]):
             activation = categorical_activations[i]
@@ -220,6 +225,7 @@ def get_categorical_steering_vector_probe(
     harmful_strength: float,
     steering_vector_mapping: dict[int, torch.Tensor],
     probe_model: nn.Module,
+    probe_X_mean: torch.Tensor,
     probe_threshold: float = 0.5,
     activation_name: str = "resid_post",
     layer: int = 18,
@@ -244,15 +250,18 @@ def get_categorical_steering_vector_probe(
 
     hooked_model.reset_hooks()
 
-    logits_next = outputs[:, -1, :]  # shape: (B, vocab_size)
+    logits_next = outputs[:, -1, :]  # shape: (batch_size, vocab_size)
     probs_next = F.softmax(logits_next, dim=-1)
 
     token_activation = token_activation.to(device, dtype=torch.float32)
 
+    # Center token activation
+    # token_activation = token_activation - probe_X_mean.to(device, dtype=torch.float32)
+
     with torch.inference_mode():
         harmful_score = torch.sigmoid(
             probe_model(token_activation).squeeze(-1)
-        ).item()  # shape: (B)
+        ).item()  # shape: (batch_size)
 
     harmful_decision = harmful_score >= probe_threshold
 
@@ -264,25 +273,16 @@ def get_categorical_steering_vector_probe(
         128260: "Unsupported requests",
     }
 
-    respond_token_id = 128261
-
     refusal_token_ids = torch.tensor(
         list(refusal_category_mapping.keys()), device=device
     )
 
     refusal_probs = probs_next.index_select(
         dim=1, index=refusal_token_ids
-    )  # shape: (B, 5)
-
-    # respond_prob = probs_next.index_select(
-    #     dim=1, index=torch.tensor(respond_token_id, device=device)
-    # )  # shape: (B, 1)
+    )  # shape: (batch_size, 5)
 
     top_refusal_prob, top_refusal_token_idx = refusal_probs.max(dim=1)
     top_refusal_token_id = refusal_token_ids[top_refusal_token_idx].item()
-
-    # print("Top refusal prob and id:", top_refusal_prob.item(), top_refusal_token_id)
-    # print("Respond prob: ", respond_prob.item())
 
     if harmful_decision:
         # Harmful
@@ -303,6 +303,7 @@ def get_low_rank_map_steering_probe(
     harmful_strength: float,
     low_rank_map: LowRankSteeringMap,
     probe_model: nn.Module,
+    probe_X_mean: torch.Tensor,
     probe_threshold: float = 0.5,
     activation_name: str = "resid_post",
     layer: int = 18,
@@ -328,6 +329,9 @@ def get_low_rank_map_steering_probe(
     hooked_model.reset_hooks()
 
     token_activation = token_activation.to(device, dtype=torch.float32)
+
+    # Center token activation
+    # token_activation = token_activation - probe_X_mean.to(device, dtype=torch.float32)
 
     with torch.inference_mode():
         harmful_score = torch.sigmoid(

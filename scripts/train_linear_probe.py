@@ -11,18 +11,18 @@ from torch.utils.data import (
 from sklearn.metrics import roc_curve, auc
 
 
-def compute_mean(train_probe_dataloader: DataLoader) -> torch.Tensor:
+def compute_mean_probe_activations(train_probe_dataloader: DataLoader) -> torch.Tensor:
     features = []
     with torch.no_grad():
         for activations_batch, _ in train_probe_dataloader:
             features.append(activations_batch.float().cpu())
 
-    X = torch.cat(features, dim=0)  # X shape: (N, d)
+    X = torch.cat(features, dim=0)  # X shape: (N, d_model)
 
     # Mean centering
-    X_mean = X.mean(dim=0, keepdim=True)  # shape: (1, d)
+    X_mean = X.mean(dim=0, keepdim=True)  # shape: (1, d_model)
 
-    # X_mean shape: (1, d)
+    # X_mean shape: (1, d_model)
     return X_mean.float()
 
 
@@ -38,8 +38,10 @@ def train_steering_linear_probe(
     use_calibrated_threshold: bool = True,
     checkpoint_path: str = "steering_probe_18_epoch_15.pt",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-) -> tuple[nn.Module, float, float, float, float]:
-    X_mean = compute_mean(train_probe_dataloader)
+) -> tuple[nn.Module, float, float, float, float, torch.Tensor]:
+    X_mean = compute_mean_probe_activations(
+        train_probe_dataloader
+    )  # shape: (1, d_model)
     X_mean = X_mean.to(device)
 
     optimizer = optim.AdamW(
@@ -47,13 +49,6 @@ def train_steering_linear_probe(
     )
 
     loss_fn = nn.BCEWithLogitsLoss()
-    # loss_fn = nn.BCEWithLogitsLoss(reduction="none")
-
-    weight_pos = 1.0  # harmful (label == 1)
-    weight_neg = 1.5  # benign (label == 0)
-
-    weight_pos = torch.tensor(weight_pos, device=device)
-    weight_neg = torch.tensor(weight_neg, device=device)
 
     start_epoch = 0
     probe_threshold = 0.5
@@ -159,9 +154,6 @@ def train_steering_linear_probe(
 
         return thr[best_idx], fpr[best_idx], tpr[best_idx], J[best_idx]
 
-    def center(x: torch.Tensor) -> torch.Tensor:
-        return x - X_mean
-
     for epoch in tqdm(range(start_epoch, epochs), desc=f"Training for {epochs} epochs"):
         probe_model.train()
         total_loss = 0.0
@@ -173,7 +165,7 @@ def train_steering_linear_probe(
                 device
             ), labels_batch.to(device)
 
-            activations_batch = center(activations_batch)
+            activations_batch = activations_batch - X_mean
 
             logits = probe_model(activations_batch).squeeze(-1)  # shape: (B)
             loss = loss_fn(logits, labels_batch)
@@ -195,7 +187,7 @@ def train_steering_linear_probe(
             ):
                 activations_batch = activations_batch.to(device)
 
-                activations_batch = center(activations_batch)
+                activations_batch = activations_batch - X_mean
 
                 logits = probe_model(activations_batch).squeeze(-1)
                 probs = torch.sigmoid(logits)
@@ -242,7 +234,7 @@ def train_steering_linear_probe(
             ):
                 activations_batch = activations_batch.to(device)
 
-                activations_batch = center(activations_batch)
+                activations_batch = activations_batch - X_mean
 
                 logits = probe_model(activations_batch).squeeze(-1)
                 probs = torch.sigmoid(logits)
@@ -283,6 +275,7 @@ def train_steering_linear_probe(
             "model_state_dict": probe_model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "threshold": probe_threshold,
+            "X_mean": X_mean,
         }
 
         torch.save(
@@ -290,4 +283,4 @@ def train_steering_linear_probe(
             f"steering_probe_{layer}_epoch_{epoch + 1}.pt",
         )
 
-    return probe_model, probe_threshold, best_auc, best_val_acc, best_test_acc
+    return probe_model, probe_threshold, best_auc, best_val_acc, best_test_acc, X_mean

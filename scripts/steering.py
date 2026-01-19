@@ -78,7 +78,6 @@ def generate_with_steering(
                 None,
                 low_rank_map,
                 strength,
-                device,
             )
         else:
             steering_vector = steering_vector.to(
@@ -90,7 +89,6 @@ def generate_with_steering(
                 steering_vector,
                 None,
                 strength,
-                device,
             )
 
         fwd_hooks.append((hook_name, hook_fn))
@@ -131,7 +129,6 @@ def steering_hook(
     steering_vector: torch.Tensor | None,
     low_rank_map: nn.Module | None,
     strength: float,
-    device: torch.device,
     activation: torch.Tensor,
     hook: HookPoint,
 ) -> torch.Tensor:
@@ -145,9 +142,9 @@ def steering_hook(
     out = activation.clone()
     token_activation = out[:, -1, :]  # shape: (batch_size, d_model)
 
-    if steering_vector:
-        vector = steering_vector.to(device)
-    elif low_rank_map:
+    if steering_vector is not None:
+        vector = steering_vector.to(device=activation.device, dtype=activation.dtype)
+    elif low_rank_map is not None:
         vector = low_rank_map(token_activation).to(
             device=activation.device, dtype=activation.dtype
         )

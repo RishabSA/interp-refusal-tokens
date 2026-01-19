@@ -24,4 +24,21 @@ class LowRankSteeringMap(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x shape: (batch_size, d_model)
         x = x.to(dtype=self.U.dtype)
+
         return (x @ self.V) @ self.U.T  # shape: (batch_size, d_model)
+
+
+class LowRankSteeringMap(nn.Module):
+    def __init__(self, steering_basis: torch.Tensor):
+        super().__init__()
+        Q = steering_basis.detach()  # shape: (d_model, rank)
+        self.register_buffer("Q", Q)
+
+        rank = Q.shape[1]
+        self.M = nn.Parameter(torch.zeros(rank, rank))  # shape: (rank, rank)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x shape: (batch_size, d_model)
+        x = x.to(dtype=self.Q.dtype)
+
+        return (x @ self.Q) @ self.M @ self.Q.T  # shape: (batch_size, d_model)

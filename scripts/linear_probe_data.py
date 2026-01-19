@@ -86,8 +86,8 @@ def get_probe_training_activations(
         f"Benign probe activations data has a shape of {benign_probe_activations.shape}"
     )
 
-    harmful_probe_activations = harmful_probe_activations.to(torch.float32)
-    benign_probe_activations = benign_probe_activations.to(torch.float32)
+    harmful_probe_activations = harmful_probe_activations.to(dtype=torch.float32)
+    benign_probe_activations = benign_probe_activations.to(dtype=torch.float32)
 
     # Get labels (1 = harmful, 0 = benign)
     N_h = harmful_probe_activations.shape[0]
@@ -179,8 +179,8 @@ def get_probe_testing_activations(
         f"Benign probe activations data has a shape of {benign_probe_activations.shape}"
     )
 
-    harmful_probe_activations = harmful_probe_activations.to(torch.float32)
-    benign_probe_activations = benign_probe_activations.to(torch.float32)
+    harmful_probe_activations = harmful_probe_activations.to(dtype=torch.float32)
+    benign_probe_activations = benign_probe_activations.to(dtype=torch.float32)
 
     # Get labels (1 = harmful, 0 = benign)
     N_h = harmful_probe_activations.shape[0]

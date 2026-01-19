@@ -281,7 +281,6 @@ def generate_outputs_dataset(
                                 None,
                                 low_rank_map,
                                 strength,
-                                device,
                             )
                         else:
                             hook_fn = partial(
@@ -289,7 +288,6 @@ def generate_outputs_dataset(
                                 steer_batch,
                                 None,
                                 strength,
-                                device,
                             )
 
                         fwd_hooks.append((hook_name, hook_fn))
@@ -375,6 +373,10 @@ def generate_outputs_dataset(
 
             except Exception as e:
                 print(f"Error in batch: {e}")
+                import traceback
+
+                traceback.print_exc()
+                raise
 
     # Save model outputs to .jsonl file
     pd.DataFrame(model_outputs).to_json(
@@ -428,12 +430,12 @@ def eval_outputs_dataset(
             total_correct += num_correct
             total += len(batch)
 
-            if categorical_accuracies[category].get("correct", None):
+            if "correct" in categorical_accuracies[category]:
                 categorical_accuracies[category]["correct"] += num_correct
             else:
                 categorical_accuracies[category]["correct"] = num_correct
 
-            if categorical_accuracies[category].get("total", None):
+            if "total" in categorical_accuracies[category]:
                 categorical_accuracies[category]["total"] += len(batch)
             else:
                 categorical_accuracies[category]["total"] = len(batch)

@@ -4,13 +4,13 @@ import torch.nn.functional as F
 
 
 def compute_model_diffing_cosine_sims(
-    steering_vectors_activations: dict[str, torch.Tensor],
-    steering_vectors_activations_llama: dict[str, torch.Tensor],
+    steering_vectors: dict[str, torch.Tensor],
+    steering_vectors_llama: dict[str, torch.Tensor],
 ) -> dict[str, float]:
     model_diffing_cosine_sims = {}
 
     for (category, steering_vector), (category_llama, steering_vector_llama) in zip(
-        steering_vectors_activations.items(), steering_vectors_activations_llama.items()
+        steering_vectors.items(), steering_vectors_llama.items()
     ):
         if category != category_llama:
             print("Error: categories do not match")
