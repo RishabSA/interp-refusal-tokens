@@ -129,23 +129,35 @@ For the LLM as a judge, we use **`GPT-5-mini**`.
 
 #### Refusal Rate by LLM as a Judge
 
+**`448/1001 -> 44.7552%`**
+**`430/1001 -> 42.9570%`**
+**`459/1001 -> 45.8541%`**
+
+**`44.5221% ± 1.1942%`**
+
 | Category                      | Ratio 1 | Refusal Rate 1 | Ratio 2 | Refusal Rate 2 | Ratio 3 | Refusal Rate 3 |
 | ----------------------------- | ------- | -------------- | ------- | -------------- | ------- | -------------- |
-| Requests with safety concerns |         |                |         |                |         |                |
-| Unsupported requests          |         |                |         |                |         |                |
-| Indeterminate requests        |         |                |         |                |         |                |
-| Incomplete requests           |         |                |         |                |         |                |
-| Humanizing requests           |         |                |         |                |         |                |
+| Requests with safety concerns | 255/395 | 64.5570%       | 248/395 | 62.7848%       | 257/395 | 65.0633%       |
+| Unsupported requests          | 93/157  | 59.2357%       | 82/157  | 52.2293%       | 97/157  | 61.7834%       |
+| Indeterminate requests        | 38/142  | 26.7606%       | 41/142  | 28.8732%       | 45/142  | 31.6901%       |
+| Incomplete requests           | 36/225  | 16.0000%       | 37/225  | 16.4444%       | 30/225  | 13.3333%       |
+| Humanizing requests           | 26/82   | 31.7073%       | 22/82   | 26.8293%       | 30/82   | 36.5854%       |
 
 ### COCONot Contrast
 
 #### Refusal Rate by LLM as a Judge
 
+**`48/379 -> 12.6649%`**
+**`49/379 -> 12.9288%`**
+**`47/379 -> 12.4011%`**
+
+**`12.6649% ± 0.2154%`**
+
 | Category                      | Ratio 1 | Refusal Rate 1 | Ratio 2 | Refusal Rate 2 | Ratio 3 | Refusal Rate 3 |
 | ----------------------------- | ------- | -------------- | ------- | -------------- | ------- | -------------- |
-| Requests with safety concerns |         |                |         |                |         |                |
-| Unsupported requests          |         |                |         |                |         |                |
-| Incomplete requests           |         |                |         |                |         |                |
+| Requests with safety concerns | 44/149  | 29.5302%       | 44/149  | 29.5302%       | 39/149  | 26.1745%       |
+| Unsupported requests          | 3/82    | 3.6585%        | 3/82    | 3.6585%        | 3/82    | 3.6585%        |
+| Incomplete requests           | 1/148   | 0.6757%        | 2/148   | 1.3514%        | 5/148   | 3.3784%        |
 
 ### WildGuard Unharmful
 
