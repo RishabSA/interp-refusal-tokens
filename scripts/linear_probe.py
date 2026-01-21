@@ -260,7 +260,7 @@ def get_categorical_steering_vector_probe(
 
     with torch.inference_mode():
         harmful_score = torch.sigmoid(
-            probe_model(token_activation).squeeze(-1)
+            probe_model(token_activation).squeeze(dim=-1)
         ).item()  # shape: (batch_size)
 
     harmful_decision = harmful_score >= probe_threshold

@@ -1,7 +1,6 @@
 import os
 from functools import partial
 from tqdm.auto import tqdm
-from tqdm.contrib import tzip
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
