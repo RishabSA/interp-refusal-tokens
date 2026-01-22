@@ -10,7 +10,7 @@ class LowRankSteeringCombination(nn.Module):
         self.V = nn.Parameter(steering_basis.clone())  # shape: (d_model, rank)
         self.z = nn.Parameter(0.01 * torch.randn(d_model))  # shape: (d_model)
 
-    def delta(self) -> torch.Tensor:
+    def forward(self) -> torch.Tensor:
         return self.U @ (self.V.T @ self.z)  # shape: (d_model)
 
 

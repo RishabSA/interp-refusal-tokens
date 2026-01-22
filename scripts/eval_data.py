@@ -282,7 +282,7 @@ def load_adv_bench_test_data(batch_size: int = 4) -> DataLoader:
     def adv_bench_collate(batch):
         return {
             "prompt": [example["prompt"] for example in batch],
-            "category": ["None" in batch],
+            "category": ["None" for _ in batch],
         }
 
     adv_bench_dataloader = DataLoader(

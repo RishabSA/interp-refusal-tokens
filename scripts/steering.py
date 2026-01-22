@@ -8,8 +8,6 @@ from transformers import PreTrainedTokenizerBase
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 
-from scripts.low_rank_combination_steering import LowRankSteeringMap
-
 
 def generate_with_steering(
     prompt: str,
@@ -40,8 +38,8 @@ def generate_with_steering(
 
     strength = fixed_strength
 
-    low_rank_map = None
-    use_low_rank_map = False
+    low_rank_combination = None
+    use_low_rank_combination = False
 
     if steering_vector is None and get_steering_vector is not None:
         if fixed_strength is not None:
@@ -63,20 +61,20 @@ def generate_with_steering(
                 "You must pass in values for either fixed_strength or benign_strength and harmful_strength"
             )
 
-        if isinstance(steering_vector, LowRankSteeringMap):
-            low_rank_map = steering_vector  # weird naming
-            use_low_rank_map = True
+        if isinstance(steering_vector, nn.Module):
+            low_rank_combination = steering_vector  # weird naming
+            use_low_rank_combination = True
 
     fwd_hooks = []
 
     if steering_vector is not None:
         hook_name = get_act_name(activation_name, layer)
 
-        if use_low_rank_map:
+        if use_low_rank_combination:
             hook_fn = partial(
                 steering_hook,
                 None,
-                low_rank_map,
+                low_rank_combination,
                 strength,
             )
         else:
@@ -127,7 +125,7 @@ def generate_with_steering(
 
 def steering_hook(
     steering_vector: torch.Tensor | None,
-    low_rank_map: nn.Module | None,
+    low_rank_combination: nn.Module | None,
     strength: float,
     activation: torch.Tensor,
     hook: HookPoint,
@@ -144,17 +142,17 @@ def steering_hook(
 
     if steering_vector is not None:
         vector = steering_vector.to(device=activation.device, dtype=activation.dtype)
-    elif low_rank_map is not None:
-        vector = low_rank_map(token_activation).to(
-            device=activation.device, dtype=activation.dtype
-        )
+    elif low_rank_combination is not None:
+        # vector = low_rank_combination(token_activation).to(
+        #     device=activation.device, dtype=activation.dtype
+        # ) # shape: (d_model)
 
-        # steering_vector = low_rank_steering_shift.delta().to(
-        #     device, activation.dtype
-        # )  # shape: (d_model)
+        vector = low_rank_combination().to(
+            device=activation.device, dtype=activation.dtype
+        )  # shape: (d_model)
     else:
         raise ValueError(
-            "either steering_vector or low_rank_map must be provided in order to apply steering"
+            "either steering_vector or low_rank_combination must be provided in order to apply steering"
         )
 
     if vector.ndim == 1:
@@ -214,16 +212,16 @@ def get_categorical_steering_vector_fixed(
     return chosen_steering_vector, benign_strength
 
 
-def get_low_rank_map_steering_fixed(
+def get_low_rank_combination_steering_fixed(
     prompt: str,
     hooked_model: HookedTransformer,
     benign_strength: float,
     harmful_strength: float,
-    low_rank_map: LowRankSteeringMap,
-) -> tuple[LowRankSteeringMap, float]:
+    low_rank_combination: nn.Module,
+) -> tuple[nn.Module, float]:
     # Seperate strength variables for function call consistency
     assert (
         benign_strength == harmful_strength
     ), "benign_strength and harmful_strength must have the same value"
 
-    return low_rank_map, benign_strength
+    return low_rank_combination, benign_strength

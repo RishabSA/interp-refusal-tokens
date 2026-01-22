@@ -1,19 +1,20 @@
 import os
 from functools import partial
+from itertools import cycle
 from tqdm.auto import tqdm
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from transformer_lens import HookedTransformer
 from transformer_lens.utils import get_act_name
 
-from scripts.low_rank_combination_steering import LowRankSteeringMap
 from scripts.steering import steering_hook
 
 
-def train_low_rank_combination_steering_map(
+def train_low_rank_combination(
     hooked_model: HookedTransformer,
-    low_rank_map: LowRankSteeringMap,
+    low_rank_combination: nn.Module,
     harmful_training_prompts_dataloader: DataLoader,
     benign_training_prompts_dataloader: DataLoader,
     harmful_testing_prompts_dataloader: DataLoader,
@@ -25,10 +26,10 @@ def train_low_rank_combination_steering_map(
     kl_loss_weight: float = 1.0,
     epochs: int = 5,
     lr: float = 1e-3,
-    eps: float = 1e-12,
-    checkpoint_path: str = "low_rank_map_epoch_5.pt",
+    eps: float = 1e-6,
+    checkpoint_path: str = "low_rank_combination_epoch_5.pt",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-) -> LowRankSteeringMap:
+) -> nn.Module:
     def kl_divergence(
         base_probs: torch.Tensor, steered_probs: torch.Tensor
     ) -> torch.Tensor:
@@ -58,7 +59,7 @@ def train_low_rank_combination_steering_map(
 
     hook_name = get_act_name(activation_name, layer)
 
-    optimizer = torch.optim.AdamW(params=low_rank_map.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(params=low_rank_combination.parameters(), lr=lr)
     start_epoch = 0
 
     if os.path.exists(checkpoint_path):
@@ -67,11 +68,11 @@ def train_low_rank_combination_steering_map(
             checkpoint_path, map_location=device, weights_only=False
         )
 
-        low_rank_map.load_state_dict(checkpoint["model_state_dict"])
+        low_rank_combination.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         start_epoch = checkpoint["epoch"]
 
-    low_rank_map.to(device).train()
+    low_rank_combination.to(device).train()
 
     for epoch in tqdm(range(start_epoch, epochs), desc=f"Training for {epochs} epochs"):
         total_training_harmful_loss = 0.0
@@ -84,19 +85,28 @@ def train_low_rank_combination_steering_map(
         total_testing_loss = 0.0
         num_testing_batches = 0
 
+        benign_train_cycle_iter = cycle(benign_training_prompts_dataloader)
+
         training_pbar = tqdm(
-            zip(
-                harmful_training_prompts_dataloader, benign_training_prompts_dataloader
-            ),
-            total=min(
-                len(harmful_training_prompts_dataloader),
-                len(benign_training_prompts_dataloader),
-            ),
-            desc=f"Training Low-Rank Mapping epoch {epoch + 1}",
+            harmful_training_prompts_dataloader,
+            desc=f"Training Low-Rank Combination epoch {epoch + 1}",
         )
 
+        # training_pbar = tqdm(
+        #     zip(
+        #         harmful_training_prompts_dataloader, benign_training_prompts_dataloader
+        #     ),
+        #     total=min(
+        #         len(harmful_training_prompts_dataloader),
+        #         len(benign_training_prompts_dataloader),
+        #     ),
+        #     desc=f"Training Low-Rank Combination epoch {epoch + 1}",
+        # )
+
         # Training
-        for harmful_batch, benign_batch in training_pbar:
+        for harmful_batch in training_pbar:
+            benign_batch = next(benign_train_cycle_iter)
+
             num_training_batches += 1
 
             harmful_prompts = [
@@ -122,7 +132,7 @@ def train_low_rank_combination_steering_map(
             hook_fn = partial(
                 steering_hook,
                 None,
-                low_rank_map,
+                low_rank_combination,
                 strength,
             )
 
@@ -161,8 +171,23 @@ def train_low_rank_combination_steering_map(
             loss = harmful_loss + kl_loss_weight * kl_loss
             total_training_loss += loss.item()
 
+            if not torch.isfinite(loss):
+                print("Non-finite loss detected.")
+                print("harmful_loss:", harmful_loss.item(), "kl_loss:", kl_loss.item())
+                print(
+                    "steered_harmful_logits finite:",
+                    torch.isfinite(steered_harmful_logits).all().item(),
+                )
+                print(
+                    "steered_benign_logits finite:",
+                    torch.isfinite(steered_benign_logits).all().item(),
+                )
+
+                break
+
             optimizer.zero_grad()
             loss.backward()
+            nn.utils.clip_grad_norm_(low_rank_combination.parameters(), max_norm=1.0)
             optimizer.step()
 
             hooked_model.reset_hooks()
@@ -188,17 +213,26 @@ def train_low_rank_combination_steering_map(
                 loss,
             )
 
+        benign_test_cycle_iter = cycle(benign_testing_prompts_dataloader)
+
         testing_pbar = tqdm(
-            zip(harmful_testing_prompts_dataloader, benign_testing_prompts_dataloader),
-            total=min(
-                len(harmful_testing_prompts_dataloader),
-                len(benign_testing_prompts_dataloader),
-            ),
-            desc=f"Testing Low-Rank Mapping epoch {epoch + 1}",
+            harmful_testing_prompts_dataloader,
+            desc=f"Testing Low-Rank Combination epoch {epoch + 1}",
         )
 
+        # testing_pbar = tqdm(
+        #     zip(harmful_testing_prompts_dataloader, benign_testing_prompts_dataloader),
+        #     total=min(
+        #         len(harmful_testing_prompts_dataloader),
+        #         len(benign_testing_prompts_dataloader),
+        #     ),
+        #     desc=f"Testing Low-Rank Combination epoch {epoch + 1}",
+        # )
+
         # Testing
-        for harmful_batch, benign_batch in testing_pbar:
+        for harmful_batch in testing_pbar:
+            benign_batch = next(benign_test_cycle_iter)
+
             num_testing_batches += 1
 
             harmful_prompts = [
@@ -224,7 +258,7 @@ def train_low_rank_combination_steering_map(
             hook_fn = partial(
                 steering_hook,
                 None,
-                low_rank_map,
+                low_rank_combination,
                 strength,
             )
 
@@ -303,13 +337,13 @@ def train_low_rank_combination_steering_map(
 
         checkpoint = {
             "epoch": epoch + 1,
-            "model_state_dict": low_rank_map.state_dict(),
+            "model_state_dict": low_rank_combination.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
         }
 
         torch.save(
             checkpoint,
-            f"low_rank_map_epoch_{epoch + 1}.pt",
+            f"low_rank_combination_epoch_{epoch + 1}.pt",
         )
 
-    return low_rank_map
+    return low_rank_combination

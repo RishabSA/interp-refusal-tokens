@@ -35,8 +35,10 @@ def get_prompt_training_data(
     if "coconot" in load_datasets:
         # COCONot Dataset loading
         coconot_orig = load_dataset("allenai/coconot", "original")
+        coconot_contrast = load_dataset("allenai/coconot", "contrast")
 
-        harmful_datasets.append(coconot_orig["train"])  # 12.5k items
+        harmful_datasets.append(coconot_orig["train"])  # 11.5k items
+        benign_datasets.append(coconot_contrast["test"])  # 379 items
 
     if "wildguard" in load_datasets:
         # WildGuardMix Dataset loading
@@ -145,7 +147,7 @@ def get_prompt_testing_data(
         coconot_orig = load_dataset("allenai/coconot", "original")
         coconot_contrast = load_dataset("allenai/coconot", "contrast")
 
-        harmful_datasets.append(coconot_orig["test"])  # 12.5k items
+        harmful_datasets.append(coconot_orig["test"])  # 1k items
         benign_datasets.append(coconot_contrast["test"])  # 379 items
 
     if "wildguard" in load_datasets:

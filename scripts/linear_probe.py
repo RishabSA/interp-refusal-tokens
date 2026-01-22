@@ -11,8 +11,6 @@ from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 from datasets import load_dataset, concatenate_datasets
 
-from scripts.low_rank_combination_steering import LowRankSteeringMap
-
 
 class LinearProbe(nn.Module):
     """1-layer linear probe that takes in [4096] residual-stream activations at a token position, which outputs 1 value for each item in the batch.
@@ -296,19 +294,19 @@ def get_categorical_steering_vector_probe(
         return steering_vector_mapping[top_refusal_token_id], benign_strength
 
 
-def get_low_rank_map_steering_probe(
+def get_low_rank_combination_steering_probe(
     prompt: str,
     hooked_model: HookedTransformer,
     benign_strength: float,
     harmful_strength: float,
-    low_rank_map: LowRankSteeringMap,
+    low_rank_combination: nn.Module,
     probe_model: nn.Module,
     probe_X_mean: torch.Tensor,
     probe_threshold: float = 0.5,
     activation_name: str = "resid_post",
     layer: int = 18,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-) -> tuple[LowRankSteeringMap, float]:
+) -> tuple[nn.Module, float]:
     token_activation = None
 
     hook_name = get_act_name(activation_name, layer)
@@ -342,10 +340,10 @@ def get_low_rank_map_steering_probe(
 
     if harmful_decision:
         # Harmful
-        return low_rank_map, harmful_strength
+        return low_rank_combination, harmful_strength
     else:
         # Benign
-        return low_rank_map, benign_strength
+        return low_rank_combination, benign_strength
 
 
 def get_random_categorical_steering_vector_probe(
