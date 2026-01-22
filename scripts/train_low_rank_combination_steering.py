@@ -85,10 +85,10 @@ def train_low_rank_combination(
         total_testing_loss = 0.0
         num_testing_batches = 0
 
-        benign_train_cycle_iter = cycle(benign_training_prompts_dataloader)
+        harmful_train_cycle_iter = cycle(harmful_training_prompts_dataloader)
 
         training_pbar = tqdm(
-            harmful_training_prompts_dataloader,
+            benign_training_prompts_dataloader,
             desc=f"Training Low-Rank Combination epoch {epoch + 1}",
         )
 
@@ -104,8 +104,8 @@ def train_low_rank_combination(
         # )
 
         # Training
-        for harmful_batch in training_pbar:
-            benign_batch = next(benign_train_cycle_iter)
+        for benign_batch in training_pbar:
+            harmful_batch = next(harmful_train_cycle_iter)
 
             num_training_batches += 1
 
@@ -193,9 +193,9 @@ def train_low_rank_combination(
             hooked_model.reset_hooks()
 
             training_pbar.set_postfix(
-                harmful_loss=f"{harmful_loss.item():.6f}",
-                kl_loss=f"{kl_loss.item():.6f}",
-                loss=f"{loss.item():.6f}",
+                harmful_loss=f"{harmful_loss.item():.8f}",
+                kl_loss=f"{kl_loss.item():.8f}",
+                loss=f"{loss.item():.8f}",
             )
 
             del (
@@ -213,10 +213,10 @@ def train_low_rank_combination(
                 loss,
             )
 
-        benign_test_cycle_iter = cycle(benign_testing_prompts_dataloader)
+        harmful_test_cycle_iter = cycle(harmful_testing_prompts_dataloader)
 
         testing_pbar = tqdm(
-            harmful_testing_prompts_dataloader,
+            benign_testing_prompts_dataloader,
             desc=f"Testing Low-Rank Combination epoch {epoch + 1}",
         )
 
@@ -230,8 +230,8 @@ def train_low_rank_combination(
         # )
 
         # Testing
-        for harmful_batch in testing_pbar:
-            benign_batch = next(benign_test_cycle_iter)
+        for benign_batch in testing_pbar:
+            harmful_batch = next(harmful_test_cycle_iter)
 
             num_testing_batches += 1
 

@@ -4,6 +4,7 @@ from collections import defaultdict
 from tqdm.auto import tqdm
 import pandas as pd
 import torch
+import torch.nn as nn
 from torch import amp
 from functools import partial
 import uuid
