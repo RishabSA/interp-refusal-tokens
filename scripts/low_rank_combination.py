@@ -1,34 +1,4 @@
-import os
 import torch
-from torch.utils.data import DataLoader
-from datasets import load_dataset
-
-
-def get_low_rank_combination_data(
-    batch_size: int = 4,
-) -> DataLoader:
-    # COCONot Dataset loading
-    coconot_orig = load_dataset("allenai/coconot", "original")  # 12.5k items
-    coconot_contrast = load_dataset("allenai/coconot", "contrast")  # 379 items
-
-    def prompt_category_collate(batch: list[dict]) -> dict[str, list[str]]:
-        return {
-            "prompt": [sample["prompt"] for sample in batch],
-            "category": [sample.get("category") for sample in batch],
-        }
-
-    coconot_benign_dataloader = DataLoader(
-        coconot_contrast["test"],
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=os.cpu_count(),
-        pin_memory=True,
-        collate_fn=prompt_category_collate,
-    )
-
-    print(f"Benign prompts dataloader has {len(coconot_benign_dataloader)} batches")
-
-    return coconot_benign_dataloader
 
 
 def compute_covariance_sigma(

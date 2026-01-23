@@ -191,10 +191,10 @@ def eval_outputs_dataset_llama_judge(
     total_refusals = 0
     total = 0
 
-    categorical_counts = {k: {} for k in categorical_outputs.keys()}
+    categorical_counts = {key: {} for key in categorical_outputs.keys()}
 
     for category, outputs in categorical_outputs.items():
-        # Batch this category
+        # Batch the outputs in each category
         batched_outputs = [
             outputs[i : i + batch_size] for i in range(0, len(outputs), batch_size)
         ]
