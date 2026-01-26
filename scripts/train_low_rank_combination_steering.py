@@ -30,13 +30,6 @@ def train_low_rank_combination(
     checkpoint_path: str = "low_rank_combination_epoch_5.pt",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> nn.Module:
-    def kl_divergence(
-        base_probs: torch.Tensor, steered_probs: torch.Tensor
-    ) -> torch.Tensor:
-        # base_probs, steered_probs shape: (batch_size, vocab_size)
-
-        return (base_probs * (base_probs / steered_probs).log()).sum(dim=-1).mean()
-
     def kl_divergence_from_logits(
         base_logits: torch.Tensor,
         steered_logits: torch.Tensor,

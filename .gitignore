@@ -1,7 +1,6 @@
 papers/
 saved_outputs/
-
-*.pem
+OLD_V1_NeurIPS/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

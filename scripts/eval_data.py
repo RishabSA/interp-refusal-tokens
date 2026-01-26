@@ -367,35 +367,3 @@ def load_do_not_answer_test_data(batch_size: int = 4) -> DataLoader:
     print(f"Do-Not-Answer Batches: {len(do_not_answer_dataloader)}")
 
     return do_not_answer_dataloader
-
-
-def load_beaver_tails_test_data(batch_size: int = 4) -> DataLoader:
-    """Loads the BeaverTails dataset from HuggingFace and returns a dataloader.
-
-    Args:
-        batch_size (int, optional). Defaults to 4.
-
-    Returns:
-        DataLoader
-    """
-    # BeaverTails
-    beaver_tails = load_dataset("PKU-Alignment/BeaverTails")  # 3.02k items
-
-    def beaver_tails_collate(batch):
-        return {
-            "prompt": [example["prompt"] for example in batch],
-            "category": ["None" for _ in batch],
-        }
-
-    beaver_tails_dataloader = DataLoader(
-        beaver_tails["30k_test"],
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=os.cpu_count(),
-        pin_memory=True,
-        collate_fn=beaver_tails_collate,
-    )
-
-    print(f"BeaverTails Batches: {len(beaver_tails_dataloader)}")
-
-    return beaver_tails_dataloader

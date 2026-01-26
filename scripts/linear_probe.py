@@ -30,7 +30,7 @@ class LinearProbe(nn.Module):
 
 
 def load_probe_model(
-    probe_model: nn.Module,
+    probe_model: LinearProbe,
     path: str = "steering_probe_18.pt",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> tuple[nn.Module, int, torch.Tensor]:
@@ -54,14 +54,12 @@ def load_probe_model(
 def analyze_probe_direction_with_activations(
     prompts_dict: dict[str, list[str]],
     activations_dict: dict[str, torch.Tensor],
-    probe_model: nn.Module,
+    probe_model: LinearProbe,
     probe_X_mean: torch.Tensor,
     K: int = 10,
     outputs_save_path: str = "probe_direction_analysis.jsonl",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> None:
-    assert isinstance(probe_model, LinearProbe), "probe_model must be a LinearProbe"
-
     probe_weight_direction = probe_model.head.weight.squeeze(dim=0)
 
     scored_examples = []
@@ -113,7 +111,7 @@ def analyze_probe_direction_with_activations(
 
 def compare_probe_direction_with_steering_vectors(
     steering_vectors: dict[str, torch.Tensor],
-    probe_model: nn.Module,
+    probe_model: LinearProbe,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> dict[str, float]:
     assert isinstance(probe_model, LinearProbe), "probe_model must be a LinearProbe"
@@ -222,7 +220,7 @@ def get_categorical_steering_vector_probe(
     benign_strength: float,
     harmful_strength: float,
     steering_vector_mapping: dict[int, torch.Tensor],
-    probe_model: nn.Module,
+    probe_model: LinearProbe,
     probe_X_mean: torch.Tensor,
     probe_threshold: float = 0.5,
     activation_name: str = "resid_post",
@@ -300,7 +298,7 @@ def get_low_rank_combination_steering_probe(
     benign_strength: float,
     harmful_strength: float,
     low_rank_combination: nn.Module,
-    probe_model: nn.Module,
+    probe_model: LinearProbe,
     probe_X_mean: torch.Tensor,
     probe_threshold: float = 0.5,
     activation_name: str = "resid_post",
@@ -352,7 +350,7 @@ def get_random_categorical_steering_vector_probe(
     benign_strength: float,
     harmful_strength: float,
     steering_vector_mapping: dict[int, torch.Tensor],
-    probe_model: nn.Module,
+    probe_model: LinearProbe,
     probe_threshold: float = 0.5,
     activation_name: str = "resid_post",
     layer: int = 18,

@@ -31,7 +31,7 @@ def compute_steering_basis(
         + eps * torch.eye(covariance_sigma.shape[0], device=covariance_sigma.device)
     )
 
-    # Used to remove activation-space aniostropyso that all steering directions are equal
+    # Used to remove activation-space aniostropy, so that all steering directions are equal
     whitening_matrix = torch.matmul(
         (U * (S.clamp_min(eps).rsqrt())), U.T
     )  # shape: (d_model, d_model)

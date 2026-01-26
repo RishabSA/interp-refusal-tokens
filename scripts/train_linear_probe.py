@@ -5,10 +5,10 @@ from tqdm.auto import tqdm
 import torch
 import torch.nn as nn
 from torch import optim
-from torch.utils.data import (
-    DataLoader,
-)
+from torch.utils.data import DataLoader
 from sklearn.metrics import roc_curve, auc
+
+from scripts.linear_probe import LinearProbe
 
 
 def compute_mean_probe_activations(train_probe_dataloader: DataLoader) -> torch.Tensor:
@@ -27,7 +27,7 @@ def compute_mean_probe_activations(train_probe_dataloader: DataLoader) -> torch.
 
 
 def train_steering_linear_probe(
-    probe_model: nn.Module,
+    probe_model: LinearProbe,
     train_probe_dataloader: DataLoader,
     val_probe_dataloader: DataLoader,
     test_probe_dataloader: DataLoader,
