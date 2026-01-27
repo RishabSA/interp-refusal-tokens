@@ -6,7 +6,6 @@ import torch.nn.functional as F
 from transformer_lens.utils import get_act_name
 from transformers import PreTrainedTokenizerBase
 from transformer_lens import HookedTransformer
-
 from lm_eval.api.model import LM
 from lm_eval import evaluator
 
@@ -232,7 +231,6 @@ class TLensSteeredLM(LM):
         return prompt, until, max_gen_toks
 
     def loglikelihood(self, requests):
-        # Log-Likelihood is used for MMLU and TruthfulQA MC
         out = []
 
         for req in tqdm(requests, desc="loglikelihood", leave=False):
@@ -284,7 +282,6 @@ class TLensSteeredLM(LM):
         return out
 
     def generate_until(self, requests):
-        # Generate Until is used for GSM8k
         res = []
 
         for req in tqdm(requests, desc="generate_until", leave=False):
@@ -330,7 +327,7 @@ class TLensSteeredLM(LM):
 
 def run_lm_eval_harness_steered(
     mode: str = "baseline",  # baseline, categorical_steering, low_rank_combination
-    tasks: str = "gsm8k,mmlu,truthfulqa_mc1,truthfulqa_mc2",
+    tasks: str = "mmlu,truthfulqa_mc1,truthfulqa_mc2,hellaswag,arc_challenge,piqa",
     num_fewshot: int | None = None,
     batch_size: int = 1,
     model_id: str = "tomg-group-umd/zephyr-llama3-8b-sft-refusal-n-contrast-multiple-tokens",
@@ -346,7 +343,7 @@ def run_lm_eval_harness_steered(
     probe_X_mean: torch.Tensor = None,
     output_json_path: str = "lm_eval_harness_steered_outputs.json",
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-) -> None:
+) -> dict:
     hooked_model, tokenizer = load_hooked_model(model_id)
 
     lm = TLensSteeredLM(
@@ -388,3 +385,5 @@ def run_lm_eval_harness_steered(
             json.dump(results, file, indent=4)
 
         print(f"\nSaved full JSON output results to: {output_json_path}")
+
+    return results

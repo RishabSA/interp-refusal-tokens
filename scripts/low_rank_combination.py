@@ -48,7 +48,7 @@ def compute_steering_basis(
         whitening_matrix, steering_vector_stacked
     )  # shape: (d_model, 5)
 
-    # Orthonormalize with QR Decomposition (whitening_matrix = QR)
+    # Orthonormalize with QR Decomposition (whitened_vectors = QR)
     Q, R = torch.linalg.qr(
         whitened_vectors, mode="reduced"
     )  # Q shape: (d_model, 5), R shape: (5, 5)
