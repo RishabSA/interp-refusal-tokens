@@ -234,7 +234,7 @@ if __name__ == "__main__":
         client=client,
         batch_size=32,
         description="LLM as a Judge Refusal Rate",
-        outputs_load_path="saved_outputs/model_outputs/transfer-llama-instruct/xstest_unsafe_outputs_llama-instruct_low_rank_combination_steered.jsonl",
+        outputs_load_path="saved_outputs/model_outputs/refuse-llama_categorical_steering/coconot_orig_test_outputs_categorical-refusal_categorically_steered.jsonl",
     )
 
     # single_is_refusal = refusal_single_output_llama_judge(client=client, model_response="", max_tokens=128)

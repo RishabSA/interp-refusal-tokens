@@ -19,7 +19,7 @@ from scripts.linear_probe import (
 from scripts.low_rank_combination_steering import LowRankSteeringCombination
 
 
-class TLensSteeredLM(LM):
+class TransformerLensSteeredLM(LM):
     def __init__(
         self,
         hooked_model: HookedTransformer,
@@ -70,7 +70,7 @@ class TLensSteeredLM(LM):
 
         self._route_cache = {}
 
-    def _trim_until(self, text, until_list):
+    def _trim_until(self, text: str, until_list: list[str] | str) -> str:
         if not until_list:
             return text
 
@@ -78,11 +78,11 @@ class TLensSteeredLM(LM):
             until_list = [until_list]
 
         cut = None
-        for u in until_list:
-            if not u:
+        for until in until_list:
+            if not until:
                 continue
 
-            idx = text.find(u)
+            idx = text.find(until)
 
             if idx != -1:
                 if cut is None or idx < cut:
@@ -93,10 +93,10 @@ class TLensSteeredLM(LM):
 
         return text[:cut]
 
-    def tok_encode(self, string):
+    def tok_encode(self, string: str) -> list[int]:
         return self.tokenizer.encode(string, add_special_tokens=False)
 
-    def tok_decode(self, tokens):
+    def tok_decode(self, tokens: list[int]) -> str:
         return self.tokenizer.decode(tokens)
 
     @property
@@ -129,12 +129,12 @@ class TLensSteeredLM(LM):
     def device(self, d):
         self._device = d
 
-    def _get_hooks_for_context(self, context_str):
+    def _get_hooks_for_context(self, context_str: str) -> list[tuple[str, callable]]:
         if self.mode == "baseline":
             return []
 
         if context_str in self._route_cache:
-            steering_obj, strength, kind = self._route_cache[context_str]
+            steering_object, strength, kind = self._route_cache[context_str]
         else:
             routed_prompt = context_str + self.append_seq
 
@@ -144,7 +144,7 @@ class TLensSteeredLM(LM):
                         "categorical_steering requires steering_vector_mapping and probe_model"
                     )
 
-                steering_obj, strength = get_categorical_steering_vector_probe(
+                steering_object, strength = get_categorical_steering_vector_probe(
                     prompt=routed_prompt,
                     hooked_model=self.model,
                     benign_strength=self.benign_strength,
@@ -165,7 +165,7 @@ class TLensSteeredLM(LM):
                         "low_rank_combination requires low_rank_combination and probe_model"
                     )
 
-                steering_obj, strength = get_low_rank_combination_steering_probe(
+                steering_object, strength = get_low_rank_combination_steering_probe(
                     prompt=routed_prompt,
                     hooked_model=self.model,
                     benign_strength=self.benign_strength,
@@ -183,35 +183,34 @@ class TLensSteeredLM(LM):
             else:
                 raise ValueError(f"Unknown mode specified: {self.mode}")
 
-            self._route_cache[context_str] = (steering_obj, strength, kind)
+            self._route_cache[context_str] = (steering_object, strength, kind)
 
         if kind == "vector":
-            # steering_obj can be None if something went wrong
-            if steering_obj is None:
+            if steering_object is None:
                 return []
 
-            vec = steering_obj.to(
+            steering_vector = steering_object.to(
                 self.device, dtype=next(self.model.parameters()).dtype
             )
 
-            hook_fn = partial(steering_hook, vec, None, strength)
+            hook_fn = partial(steering_hook, steering_vector, None, strength)
 
             return [(self.hook_name, hook_fn)]
 
         if kind == "lowrank":
-            hook_fn = partial(steering_hook, None, steering_obj, strength)
+            hook_fn = partial(steering_hook, None, steering_object, strength)
 
             return [(self.hook_name, hook_fn)]
 
         return []
 
-    def _unwrap_ll_req(self, req):
+    def _unwrap_ll_req(self, req) -> tuple[str, str]:
         if hasattr(req, "args"):
             return req.args[0], req.args[1]
 
         return req[0], req[1]
 
-    def _unwrap_gen_req(self, req):
+    def _unwrap_gen_req(self, req) -> tuple[str, list[str] | str, int]:
         if hasattr(req, "args"):
             args = req.args
             kwargs = getattr(req, "kwargs", {}) or {}
@@ -230,7 +229,7 @@ class TLensSteeredLM(LM):
 
         return prompt, until, max_gen_toks
 
-    def loglikelihood(self, requests):
+    def loglikelihood(self, requests: list) -> list[tuple[float, bool]]:
         out = []
 
         for req in tqdm(requests, desc="loglikelihood", leave=False):
@@ -269,7 +268,7 @@ class TLensSteeredLM(LM):
 
         return out
 
-    def loglikelihood_rolling(self, requests):
+    def loglikelihood_rolling(self, requests: list) -> list[tuple[float, bool]]:
         out = []
 
         for req in requests:
@@ -281,7 +280,7 @@ class TLensSteeredLM(LM):
 
         return out
 
-    def generate_until(self, requests):
+    def generate_until(self, requests: list) -> list[str]:
         res = []
 
         for req in tqdm(requests, desc="generate_until", leave=False):
@@ -327,7 +326,14 @@ class TLensSteeredLM(LM):
 
 def run_lm_eval_harness_steered(
     mode: str = "baseline",  # baseline, categorical_steering, low_rank_combination
-    tasks: str = "mmlu,truthfulqa_mc1,truthfulqa_mc2,hellaswag,arc_challenge,piqa",
+    tasks: list[str] = [
+        "mmlu",
+        "truthfulqa_mc1",
+        "truthfulqa_mc2",
+        "hellaswag",
+        "arc_challenge",
+        "piqa",
+    ],
     num_fewshot: int | None = None,
     batch_size: int = 1,
     model_id: str = "tomg-group-umd/zephyr-llama3-8b-sft-refusal-n-contrast-multiple-tokens",
@@ -346,7 +352,7 @@ def run_lm_eval_harness_steered(
 ) -> dict:
     hooked_model, tokenizer = load_hooked_model(model_id)
 
-    lm = TLensSteeredLM(
+    steered_eval_lm = TransformerLensSteeredLM(
         hooked_model=hooked_model,
         tokenizer=tokenizer,
         mode=mode,
@@ -363,18 +369,16 @@ def run_lm_eval_harness_steered(
         device=device,
     )
 
-    tasks = [task.strip() for task in tasks.split(",") if task.strip()]
     print(f"Running tasks: {tasks}")
     print(f"Mode: {mode} | num_fewshot={num_fewshot} | batch_size={batch_size}")
 
     results = evaluator.simple_evaluate(
-        model=lm,
+        model=steered_eval_lm,
         tasks=tasks,
         num_fewshot=num_fewshot,
         batch_size=batch_size,
         log_samples=True,
         verbosity="INFO",
-        # limit=50,
     )
 
     print("Results:")
