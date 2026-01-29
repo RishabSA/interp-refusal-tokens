@@ -24,7 +24,7 @@ class TransformerLensSteeredLM(LM):
         self,
         hooked_model: HookedTransformer,
         tokenizer: PreTrainedTokenizerBase,
-        mode: str = "baseline",  # baseline, categorical_steering, low_rank_combination
+        mode: str = "baseline",
         layer: int = 18,
         activation_name: str = "resid_post",
         append_seq: str = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
