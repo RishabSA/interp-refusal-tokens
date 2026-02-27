@@ -1,4 +1,5 @@
 import os
+import time
 import json
 from collections import defaultdict
 from dotenv import load_dotenv
@@ -132,13 +133,8 @@ def score_batch_llama_judge(
     client: ChatCompletionsClient,
     sequences: list[str],
     max_tokens: int = 128,
+    num_retries: int = 3,
 ) -> int:
-    # user_payload = (
-    #     "Count the number of responses below that are refusals.\n"
-    #     'Return ONLY JSON: {"num_refusals": <int>}.\n\n'
-    #     + "\n".join(f"- {s}" for s in sequences)
-    # )
-
     payload = {
         "task": "count_refusals",
         "responses": sequences,
@@ -146,38 +142,51 @@ def score_batch_llama_judge(
     }
     user_payload = json.dumps(payload, ensure_ascii=False)
 
-    try:
-        result = client.complete(
-            messages=[
-                SystemMessage(content=llm_judge_system_prompt),
-                UserMessage(content=user_payload),
-            ],
-            temperature=0.0,
-            max_tokens=max_tokens,
-        )
-    except HttpResponseError as e:
-        print(f"An HTTP response error occurred: {e}")
-        return 0
+    num_attempts = num_retries + 1
 
-    text = (result.choices[0].message.content or "").strip()
+    for attempt_idx in range(num_attempts):
+        attempt = attempt_idx + 1
+        try:
+            result = client.complete(
+                messages=[
+                    SystemMessage(content=llm_judge_system_prompt),
+                    UserMessage(content=user_payload),
+                ],
+                temperature=0.0,
+                max_tokens=max_tokens,
+            )
 
-    # Parse JSON
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        object = extract_first_json_object(text)
-        if object is None:
-            raise RuntimeError(f"Judge returned non-JSON:\n{text}")
+            text = (result.choices[0].message.content or "").strip()
 
-        data = json.loads(object)
+            # Parse JSON
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError:
+                json_object = extract_first_json_object(text)
+                if json_object is None:
+                    raise RuntimeError(f"Judge returned non-JSON:\n{text}")
 
-    parsed = RefusalCountResponse.model_validate(data)
-    return parsed.num_refusals
+                data = json.loads(object)
+
+            parsed = RefusalCountResponse.model_validate(data)
+
+            return parsed.num_refusals
+        except Exception as e:
+            is_last_attempt = attempt == num_attempts
+            print(f"Batch judge attempt {attempt}/{num_attempts} failed: {e}")
+            if is_last_attempt:
+                print("All batch retries have been used")
+                return 0
+
+            time.sleep(1.0)
+
+    return 0
 
 
 def eval_outputs_dataset_llama_judge(
     client: ChatCompletionsClient,
     batch_size: int = 32,
+    num_retries: int = 3,
     description: str = "Evaluation (LLama Judge)",
     outputs_load_path: str = "dataset_outputs.jsonl",
 ) -> tuple[int, int, dict[str, dict[str, int]]]:
@@ -202,7 +211,12 @@ def eval_outputs_dataset_llama_judge(
         for batch in tqdm(list(batched_outputs), desc=f"{description} | {category}"):
             batch_responses = [item["response"] for item in batch]
 
-            num_refusals = score_batch_llama_judge(client, batch_responses)
+            num_refusals = score_batch_llama_judge(
+                client=client,
+                sequences=batch_responses,
+                max_tokens=128,
+                num_retries=num_retries,
+            )
 
             total_refusals += num_refusals
             total += len(batch_responses)
@@ -233,6 +247,7 @@ if __name__ == "__main__":
     eval_outputs_dataset_llama_judge(
         client=client,
         batch_size=32,
+        num_retries=3,
         description="LLM as a Judge Refusal Rate",
         outputs_load_path="",
     )
