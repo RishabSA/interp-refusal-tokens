@@ -1,9 +1,9 @@
 from tqdm.auto import tqdm
 import torch
+from torch.utils.data import DataLoader
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 from transformer_lens.utils import get_act_name
-from torch.utils.data import DataLoader
 
 
 def cache_hooked_activations_before_pad(
@@ -62,7 +62,6 @@ def cache_hooked_activations_before_pad(
             tokens = hooked_model.to_tokens(prompts).to(device)
 
             # Get the per-sample last non-padding position
-            # (tokens != pad_id) is True for real tokens, False for pads
             lengths = (tokens != pad_id).sum(dim=-1)  # shape: (batch_size)
             current_positions = lengths - 1  # shape: (batch_size)
 

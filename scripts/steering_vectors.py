@@ -5,7 +5,7 @@ import torch.nn.functional as F
 def compute_contrastive_steering_vectors(
     benign_activations: dict[str, torch.Tensor],
     harmful_activations: dict[str, torch.Tensor],
-    K: int | None = 100,
+    K: int | None = 200,
     tau: float | None = 1e-3,
 ) -> dict[str, torch.Tensor]:
     steering_vectors = {}

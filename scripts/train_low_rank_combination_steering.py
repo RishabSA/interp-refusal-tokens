@@ -85,17 +85,6 @@ def train_low_rank_combination(
             desc=f"Training Low-Rank Combination epoch {epoch + 1}",
         )
 
-        # training_pbar = tqdm(
-        #     zip(
-        #         harmful_training_prompts_dataloader, benign_training_prompts_dataloader
-        #     ),
-        #     total=min(
-        #         len(harmful_training_prompts_dataloader),
-        #         len(benign_training_prompts_dataloader),
-        #     ),
-        #     desc=f"Training Low-Rank Combination epoch {epoch + 1}",
-        # )
-
         # Training
         for benign_batch in training_pbar:
             harmful_batch = next(harmful_train_cycle_iter)
@@ -212,15 +201,6 @@ def train_low_rank_combination(
             benign_testing_prompts_dataloader,
             desc=f"Testing Low-Rank Combination epoch {epoch + 1}",
         )
-
-        # testing_pbar = tqdm(
-        #     zip(harmful_testing_prompts_dataloader, benign_testing_prompts_dataloader),
-        #     total=min(
-        #         len(harmful_testing_prompts_dataloader),
-        #         len(benign_testing_prompts_dataloader),
-        #     ),
-        #     desc=f"Testing Low-Rank Combination epoch {epoch + 1}",
-        # )
 
         # Testing
         for benign_batch in testing_pbar:

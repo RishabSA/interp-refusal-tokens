@@ -1,8 +1,8 @@
 from typing import Callable
+from functools import partial
 import torch
 import torch.nn as nn
 from torch import amp
-from functools import partial
 from transformer_lens.utils import get_act_name
 from transformers import PreTrainedTokenizerBase
 from transformer_lens import HookedTransformer
