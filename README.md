@@ -53,7 +53,7 @@ To learn more about methodology details, see the full paper.
 ### Clone and Install
 
 ```bash
-git clone https://github.com/RishabSA/interp-refusal-tokens
+git clone https://github.com/RishabSA/MolGNN.git
 cd interp-refusal-tokens
 pip install -r requirements.txt
 ```
