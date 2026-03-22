@@ -81,43 +81,43 @@ interp-refusal-tokens/
 ├── README.md
 ├── CITATION.bib
 ├── requirements.txt
-├── eval_refusal_judge_azure.py  # LLM-as-judge evaluation with Azure
-├── refusal_tradeoff_plot.py  # Refusal/over-refusal tradeoff scatter plot
-├── refusal_tokens.ipynb  # Jupyter notebook for running experiments
+├── eval_refusal_judge_azure.py                    # LLM-as-judge evaluation with Azure
+├── refusal_tradeoff_plot.py                        # Refusal/over-refusal tradeoff scatter plot
+├── refusal_tokens.ipynb                            # Jupyter notebook for running experiments
 │
-├── scripts/  # Core python implementation modules split into scripts
+├── scripts/                                        # Core python implementation modules split into scripts
 │   │
 │   ├── -- Model Loading --
-│   ├── model.py  # Standard HuggingFace model loading and response generation
-│   ├── hooked_model.py  # TransformerLens hooked model loading and response generation
+│   ├── model.py                                    # Standard HuggingFace model loading and response generation
+│   ├── hooked_model.py                             # TransformerLens hooked model loading and response generation
 │   │
 │   ├── -- Data Loading --
-│   ├── training_data.py  # DataLoaders for training (COCONot, WildGuard, etc.)
-│   ├── eval_data.py  # DataLoaders for all evaluation benchmarks
-│   ├── steering_vector_data.py  # Data with refusal category tokens appended for steering vector extraction
-│   ├── linear_probe_data.py  # Cached activation datasets for linear probe training
+│   ├── training_data.py                            # DataLoaders for training (COCONot, WildGuard, etc.)
+│   ├── eval_data.py                                # DataLoaders for all evaluation benchmarks
+│   ├── steering_vector_data.py                     # Data with refusal category tokens appended for steering vector extraction
+│   ├── linear_probe_data.py                        # Cached activation datasets for linear probe training
 │   │
 │   ├── -- Activation Extraction --
-│   ├── activation_caching.py  # Cached activations by hooking and extracting final token activations
+│   ├── activation_caching.py                       # Cached activations by hooking and extracting final token activations
 │   │
 │   ├── -- Steering Vectors --
-│   ├── steering_vectors.py  # Computes categorical steering vectors with tunable hyperparameters
-│   ├── steering.py  # Applies steering hooks at inference time for steered generations with categorical routing
-│   ├── eval_steering_vectors.py # Steering vector evaluation with clustering, feature analysis, and more
+│   ├── steering_vectors.py                         # Computes categorical steering vectors with tunable hyperparameters
+│   ├── steering.py                                 # Applies steering hooks at inference time for steered generations with categorical routing
+│   ├── eval_steering_vectors.py                    # Steering vector evaluation with clustering, feature analysis, and more
 │   │
 │   ├── -- Linear Probe --
-│   ├── linear_probe.py # Linear probe model
-│   ├── train_linear_probe.py  # Linear probe training loop with AUC and threshold tuning
+│   ├── linear_probe.py                             # Linear probe model
+│   ├── train_linear_probe.py                       # Linear probe training loop with AUC and threshold tuning
 │   │
 │   ├── -- Low-Rank Combination --
-│   ├── low_rank_combination.py  # Whitening matrix and orthonormal steering basis computation
-│   ├── low_rank_combination_steering.py  # Low-rank operator U @ (V^T @ z) for single intervention
-│   ├── train_low_rank_combination_steering.py  # Low-rank operator optimization with refusal loss and KL divergence
+│   ├── low_rank_combination.py                     # Whitening matrix and orthonormal steering basis computation
+│   ├── low_rank_combination_steering.py            # Low-rank operator U @ (V^T @ z) for single intervention
+│   ├── train_low_rank_combination_steering.py      # Low-rank operator optimization with refusal loss and KL divergence
 │   │
 │   ├── -- Evaluation --
-│   ├── eval.py # Response generation and JSONL output saving on dataset evaluations
-│   ├── model_diffing.py  # Cross-model cosine similarity analysis of steering vectors
-│   └── lm_eval_harness_steered.py # LM Evaluation Harness wrapper for general benchmarking with steered models
+│   ├── eval.py                                     # Response generation and JSONL output saving on dataset evaluations
+│   ├── model_diffing.py                            # Cross-model cosine similarity analysis of steering vectors
+│   └── lm_eval_harness_steered.py                  # LM Evaluation Harness wrapper for general benchmarking with steered models
 └──
 ```
 
