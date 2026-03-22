@@ -79,7 +79,6 @@ The fine-tuned model is loaded automatically from the HuggingFace Hub. The **cat
 interp-refusal-tokens/
 │
 ├── README.md
-├── CITATION.bib
 ├── requirements.txt
 ├── eval_refusal_judge_azure.py                    # LLM-as-judge evaluation with Azure
 ├── refusal_tradeoff_plot.py                        # Refusal/over-refusal tradeoff scatter plot
