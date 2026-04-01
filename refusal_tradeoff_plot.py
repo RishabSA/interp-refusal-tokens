@@ -81,7 +81,7 @@ def plot_refusal_tradeoff(
 
 if __name__ == "__main__":
     points = [
-        ("LLama 3 8B Instruct", 29.3909, 66.7611),
+        ("LLama 3 8B Instruct", 30.6800, 66.7611),
         ("Refuse-Llama", 17.0802, 65.2143),
         ("(Ours) Refuse-Llama\n+ Categorical Steering", 3.3838, 79.3836),
         ("(Ours) Refuse-Llama\n+ Low-rank Combination", 8.1534, 78.0729),

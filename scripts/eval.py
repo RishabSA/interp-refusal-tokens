@@ -2,6 +2,7 @@ import json
 from typing import Callable
 from collections import defaultdict
 from tqdm.auto import tqdm
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -481,6 +482,11 @@ def score_refusal_token(
                 break
 
     return num_refusal
+
+
+def compute_standard_error_proportion(correct: int, total: int) -> float:
+    p = correct / total
+    return 100.0 * np.sqrt(p * (1 - p) / total)
 
 
 def steering_evaluation_layer_sweep(
