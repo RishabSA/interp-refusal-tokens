@@ -55,7 +55,7 @@ To learn more about methodology details, see the full paper.
 ```bash
 git clone https://github.com/RishabSA/interp-refusal-tokens.git
 cd interp-refusal-tokens
-pip install -r requirements.txt
+uv sync
 ```
 
 ### Environment Variables
@@ -79,7 +79,8 @@ The fine-tuned model is loaded automatically from the HuggingFace Hub. The **cat
 interp-refusal-tokens/
 │
 ├── README.md
-├── requirements.txt
+├── pyproject.toml
+├── uv.lock
 ├── eval_refusal_judge_azure.py                    # LLM-as-judge evaluation with Azure
 ├── refusal_tradeoff_plot.py                        # Refusal/over-refusal tradeoff scatter plot
 ├── refusal_tokens.ipynb                            # Jupyter notebook for running experiments

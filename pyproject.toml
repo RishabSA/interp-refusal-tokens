@@ -1,0 +1,26 @@
+[project]
+name = "interp-refusal-tokens"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13.7"
+dependencies = [
+    "azure-ai-inference>=1.0.0b9",
+    "azure-ai-projects>=2.0.1",
+    "azure-identity>=1.25.3",
+    "datasets>=4.8.4",
+    "huggingface-hub>=1.10.1",
+    "lm-eval>=0.4.11",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.4",
+    "openai>=2.31.0",
+    "pandas>=3.0.2",
+    "plotly>=6.7.0",
+    "python-dotenv>=1.2.2",
+    "scikit-learn>=1.8.0",
+    "sentencepiece>=0.2.1",
+    "torch>=2.11.0",
+    "tqdm>=4.67.3",
+    "transformer-lens>=2.16.1",
+    "transformers>=5.5.3",
+]
