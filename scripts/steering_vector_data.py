@@ -1,13 +1,6 @@
 import os
-import json
-from pathlib import Path
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from datasets import load_dataset, concatenate_datasets
-import torch
-from transformers import AutoTokenizer
-from transformer_lens import HookedTransformer
-
-from scripts.hooked_model import generate_hooked_model_response
 
 
 def get_contrast_steering_vector_data(
