@@ -109,7 +109,7 @@ After thresholding small features with $`\mathcal{T}_\tau`$ ($`\tau = 0.001`$), 
 ```math
 \mathbf{r}^{l}_{(c)} = \mathcal{T}_\tau\big(\boldsymbol{\mu}^{l}_{(c)}\big) - \mathcal{T}_\tau\big(\boldsymbol{\nu}^{l}\big),
 \qquad
-\hat{\mathbf{r}}^{l}_{(c)} = \frac{\operatorname{topK}\big(\mathbf{r}^{l}_{(c)}\big)}{\big\lVert \operatorname{topK}\big(\mathbf{r}^{l}_{(c)}\big) \big\rVert_2}
+\hat{\mathbf{r}}^{l}_{(c)} = \frac{\mathrm{topK}\big(\mathbf{r}^{l}_{(c)}\big)}{\big\lVert \mathrm{topK}\big(\mathbf{r}^{l}_{(c)}\big) \big\rVert_2}
 ```
 
 Layer $`l^\ast = 18`$ gave the best steering on a held-out validation set and the cleanest separation between categories.
